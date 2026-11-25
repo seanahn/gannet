@@ -2,7 +2,7 @@
   "name": "gannet",
   "displayName": "Gannet",
   "description": "Your GitHub repos as a tree: browse files without cloning, check out into your workspace, push as the right account.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "seanahn",
   "license": "MIT",
   "repository": {
@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "check": "for f in src/*.js bin/*.js media/*.js; do [ ! -f \"$f\" ] || node --check \"$f\" || exit 1; done",
-    "test:offline": "node test/github.test.js && node test/accounts.test.js && node test/state.test.js && node test/workspaces.test.js && node test/checkout.test.js && node test/tokenServer.test.js && node test/fsProvider.test.js && node test/tree.test.js && node test/rows.test.js && node test/page.test.js && node test/sidebar.test.js && node test/workspaceTree.test.js && node test/host.test.js",
+    "test:offline": "node test/github.test.js && node test/accounts.test.js && node test/state.test.js && node test/workspaces.test.js && node test/checkout.test.js && node test/tokenServer.test.js && node test/fsProvider.test.js && node test/tree.test.js && node test/rows.test.js && node test/page.test.js && node test/sidebar.test.js && node test/host.test.js",
     "test": "npm run -s test:offline && node test/live.test.js"
   },
   "main": "./src/extension.js",
@@ -43,11 +43,8 @@
     "views": {
       "gannet": [
         {
-          "id": "gannet.workspaces",
-          "name": "Workspaces"
-        },
-        {
-          "id": "gannet.repos",
+          "type": "webview",
+          "id": "gannet.main",
           "name": ""
         }
       ]
@@ -187,71 +184,51 @@
       ],
       "view/title": [
         {
-          "command": "gannet.addWorkspace",
-          "when": "view == gannet.workspaces",
-          "group": "navigation@1"
-        },
-        {
           "command": "gannet.addAccount",
-          "when": "view == gannet.repos",
+          "when": "view == gannet.main",
           "group": "navigation@1"
         },
         {
           "command": "gannet.refresh",
-          "when": "view == gannet.repos",
+          "when": "view == gannet.main",
           "group": "navigation@2"
         }
       ],
-      "view/item/context": [
+      "webview/context": [
         {
           "command": "gannet.checkout",
-          "when": "view == gannet.repos && viewItem == repo-remote",
-          "group": "inline"
-        },
-        {
-          "command": "gannet.checkout",
-          "when": "view == gannet.repos && viewItem =~ /^repo-/",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem =~ /^repo-/",
           "group": "1_checkout@1"
         },
         {
           "command": "gannet.checkoutTo",
-          "when": "view == gannet.repos && viewItem =~ /^repo-/",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem =~ /^repo-/",
           "group": "1_checkout@2"
         },
         {
           "command": "gannet.revealLocal",
-          "when": "view == gannet.repos && viewItem =~ /^(repo|checkout)-local/",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem =~ /^(repo|checkout)-local/",
           "group": "1_checkout@3"
         },
         {
           "command": "gannet.addToWorkspace",
-          "when": "view == gannet.repos && viewItem =~ /^(repo|checkout)-local/",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem =~ /^(repo|checkout)-local/",
           "group": "1_checkout@4"
         },
         {
           "command": "gannet.pushAs",
-          "when": "view == gannet.repos && viewItem =~ /-local-foreign$/",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem =~ /-local-foreign$/",
           "group": "1_checkout@5"
         },
         {
           "command": "gannet.openOnGitHub",
-          "when": "view == gannet.repos && viewItem =~ /^repo-/",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem =~ /^repo-/",
           "group": "2_github@1"
         },
         {
           "command": "gannet.hideAccount",
-          "when": "view == gannet.repos && viewItem =~ /^account-/",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem =~ /^account-/",
           "group": "1_account@1"
-        },
-        {
-          "command": "gannet.revealWorkspace",
-          "when": "view == gannet.workspaces && viewItem =~ /^workspace/",
-          "group": "1_open@1"
-        },
-        {
-          "command": "gannet.removeWorkspace",
-          "when": "view == gannet.workspaces && viewItem =~ /^workspace/",
-          "group": "2_edit@1"
         }
       ]
     },

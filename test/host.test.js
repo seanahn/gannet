@@ -43,7 +43,8 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
     const rec = vscode._rec;
 
     // registered: the view, the read-only provider, every command the manifest lists
-    assert.ok(rec.trees.some((t) => t.id === 'gannet.repos'));
+    assert.ok(rec.webviews.some((w) => w.id === 'gannet.main'), 'one webview view');
+    assert.strictEqual(rec.trees.length, 0, 'no tree views');
     const prov = rec.providers.find((p) => p.scheme === 'gannet');
     assert.ok(prov && prov.opts.isReadonly === true);
     for (const c of manifest.contributes.commands) assert.ok(rec.commands.has(c.command), 'registered ' + c.command);
@@ -177,7 +178,11 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
     {
       const c = ctx('storeB');
       opts.folders = [path.join(tmp, 'ws')];
-      await ext.activateWith(c, { run, fetch, home: hB });
+      // seanahn was hidden above; here GitHub lists seanahn/perch, so the page's rows reach its checkouts
+      await vscode.workspace.getConfiguration('gannet').update('hiddenAccounts', [], vscode.ConfigurationTarget.Global);
+      const ghRepos = [{ full_name: 'seanahn/perch', owner: { login: 'seanahn' }, name: 'perch', clone_url: bare, html_url: 'https://github.com/seanahn/perch', default_branch: 'main' }];
+      const fetchB = async (url) => ({ status: 200, ok: true, headers: { get: () => null }, json: async () => (/\/user\/repos/.test(String(url)) ? ghRepos : []) });
+      await ext.activateWith(c, { run, fetch: fetchB, home: hB });
       const st = ext._state();
 
       // no workspace yet: asked where, ~/github offered, made and listed
@@ -238,8 +243,10 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
       const extra = path.join(hB, 'extra');
       fs.mkdirSync(extra);
       opts.openDialog = [extra];
+      const sv = vscode._resolveView('gannet.main');
       await vscode.commands.executeCommand('gannet.addWorkspace');
       assert.ok(st.workspaces.list().includes(extra));
+      assert.ok(sv._posted.filter((m) => m.type === 'workspaces').at(-1).items.some((w) => w.path === extra), 'the panel shows it');
       opts.openDialog = [path.join(ghB, 'perch')];
       await vscode.commands.executeCommand('gannet.addWorkspace');
       assert.ok(!st.workspaces.list().includes(path.join(ghB, 'perch')), 'a repo is not a workspace');
@@ -253,8 +260,16 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
       opts.openDialog = [path.join(tmp, 'picked')];
 
       // Reveal and Push as act on one checkout: on a repo with two, they are on each checkout node
-      const one = { kind: 'checkout', account, repo: R('perch'), checkout: st.local.checkoutsOf('seanahn/perch')[1] };
-      await vscode.commands.executeCommand('gannet.pushAs', one);
+      // a right-click names its row: reach the second checkout through the page's messages
+      await sv._send({ type: 'ready' });
+      const rowsOf = (parent) => sv._posted.filter((m) => m.type === 'rows' && m.parent === parent).at(-1).rows;
+      const ownerRow = rowsOf(null).find((r) => r.label === 'seanahn');
+      await sv._send({ type: 'expand', id: ownerRow.id });
+      const perchRow = rowsOf(ownerRow.id).find((r) => r.label === 'perch');
+      assert.strictEqual(perchRow.contextValue, 'repo-multi');
+      await sv._send({ type: 'expand', id: perchRow.id });
+      const second = rowsOf(perchRow.id).find((r) => st.sidebar.resolve({ nodeId: r.id }).checkout.path === path.join(ghB, 'seanahn-perch'));
+      await vscode.commands.executeCommand('gannet.pushAs', { webviewSection: 'row', viewItem: second.contextValue, nodeId: second.id });
       assert.strictEqual(sh('git config --local credential.https://github.com.username', path.join(ghB, 'seanahn-perch')).trim(), 'seanahn');
       await vscode.commands.executeCommand('gannet.revealLocal', { kind: 'repo', account, repo: R('perch') });
       assert.notStrictEqual(rec.executed.at(-1).args[0] && rec.executed.at(-1).args[0].fsPath, path.join(ghB, 'perch'), 'a repo with two checkouts reveals neither');
@@ -293,6 +308,16 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
     }
     assert.ok(!('dependencies' in manifest) || !manifest.dependencies['jsonc-parser']);
     assert.ok(!manifest.contributes.configuration.properties['gannet.checkoutFolder'], 'retired');
+    // 0.4.0: one webview view; right-click menus on its rows; title buttons on it
+    assert.deepStrictEqual(manifest.contributes.views.gannet, [{ type: 'webview', id: 'gannet.main', name: '' }]);
+    assert.ok(!('view/item/context' in manifest.contributes.menus));
+    assert.ok(manifest.contributes.menus['webview/context'].length > 0);
+    for (const m of manifest.contributes.menus['webview/context']) assert.ok(m.when.startsWith("webviewId == 'gannet.main' && webviewSection == 'row'"), m.when);
+    for (const m of manifest.contributes.menus['view/title']) assert.strictEqual(m.when, 'view == gannet.main');
+    for (const id of ['gannet.revealWorkspace', 'gannet.removeWorkspace']) {
+      assert.ok(manifest.contributes.menus.commandPalette.some((c) => c.command === id && c.when === 'false'), id);
+    }
+    assert.ok(!fs.existsSync(path.join(__dirname, '..', 'src', 'workspaceTree.js')));
 
     // where 0.1.0 kept repos in globalState, those still on disk carry over, with their push account
     {

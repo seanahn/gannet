@@ -15,7 +15,7 @@ const { GannetTree } = require('./tree.js');
 const W = require('./workspaces.js');
 const { createMachineState } = require('./machineState.js');
 const { alive, expandHome } = require('./localRepos.js');
-const { WorkspaceTree } = require('./workspaceTree.js');
+const { GannetSidebar } = require('./sidebar.js');
 const { createRepoCache } = require('./repoCache.js');
 
 let state = null;
@@ -71,9 +71,9 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
 
   const tree = new GannetTree({ vscode, accounts, clientFor, recent, local, cache: createRepoCache(store), workspaces, home });
   const gfs = new GannetFs({ vscode, clientFor, accounts });
-  const wsTree = new WorkspaceTree({ vscode, workspaces, home });
-  const refreshAll = () => { tree.redraw(); wsTree.refresh(); };   // only ⟳ reads the repo lists again
-  state = { accounts, recent, local, tree, server, checkout, workspaces, wsTree };
+  const sidebar = new GannetSidebar({ vscode, tree, workspaces, home, extensionUri: context.extensionUri || vscode.Uri.file(context.extensionPath) });
+  const refreshAll = () => { tree.redraw(); sidebar.refreshWorkspaces(); };   // only ⟳ reads the repo lists again
+  state = { accounts, recent, local, tree, server, checkout, workspaces, sidebar };
 
   const inWorkspace = (p) => (vscode.workspace.workspaceFolders || []).some((f) => f.uri.fsPath === p);
   async function addToWorkspace(p) {
@@ -119,7 +119,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
       if (!dir || isRepo(dir)) return undefined;
       fs.mkdirSync(dir, { recursive: true });
       await workspaces.add(dir);
-      wsTree.refresh();
+      sidebar.refreshWorkspaces();
       return dir;
     }
     if (live.length === 1 && !copies.length) return live[0];
@@ -232,10 +232,10 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   };
 
   context.subscriptions.push(
-    vscode.window.createTreeView('gannet.workspaces', { treeDataProvider: wsTree, showCollapseAll: true }),
-    vscode.window.createTreeView('gannet.repos', { treeDataProvider: tree, showCollapseAll: true }),
+    vscode.window.registerWebviewViewProvider(GannetSidebar.viewType, sidebar),
     vscode.workspace.registerFileSystemProvider('gannet', gfs, { isReadonly: true, isCaseSensitive: true }),
-    ...Object.entries(commands).map(([id, fn]) => vscode.commands.registerCommand(id, fn)),
+    // a command run from a row's right-click menu gets the row's context; it names the node
+    ...Object.entries(commands).map(([id, fn]) => vscode.commands.registerCommand(id, NODE_COMMANDS.has(id) ? (arg, ...rest) => fn(sidebar.resolve(arg) || arg, ...rest) : fn)),
     accounts.onDidChange(() => tree.redraw()),
     vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration('gannet')) refreshAll(); }),
     { dispose: () => { if (server) server.close(); } },
@@ -252,6 +252,8 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     }
   })();
 }
+
+const NODE_COMMANDS = new Set(['gannet.checkout', 'gannet.checkoutTo', 'gannet.openOnGitHub', 'gannet.revealLocal', 'gannet.addToWorkspace', 'gannet.pushAs', 'gannet.hideAccount', 'gannet.signIn']);
 
 function activate(context) { return activateWith(context); }
 
