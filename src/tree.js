@@ -143,7 +143,7 @@ class GannetTree {
         it.description = [l && '● local', node.repo.private && 'private', node.repo.archived && 'archived'].filter(Boolean).join(' · ');
         it.contextValue = !l ? 'repo-remote' : l.login ? 'repo-local' : 'repo-local-foreign';
         it.tooltip = l ? `${node.repo.fullName}\n${l.path}${l.login ? `\npushes as ${l.login}` : ''}` : `${node.repo.fullName} — only on GitHub`;
-        it.iconPath = new vs.ThemeIcon(l ? 'repo-clone' : 'github');
+        it.iconPath = new vs.ThemeIcon(l ? 'repo-clone' : 'github-alt');
         return it;
       }
       case 'entry': {

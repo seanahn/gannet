@@ -52,6 +52,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gannet-tree-'));
     assert.strictEqual(item(perchNode).description, 'private');
     assert.strictEqual(item(roostNode).description, 'archived');
     assert.strictEqual(item(perchNode).contextValue, 'repo-remote');
+    assert.strictEqual(item(perchNode).iconPath.id, 'github-alt', 'the Octocat without the circle');
 
     // All repos: sorted, fetched once until refresh, with a count
     assert.deepStrictEqual(await labels(allNode), ['aa/first', 'c3-e/hub', 'seanahn/perch', 'seanahn/roost', 'zz/last']);
