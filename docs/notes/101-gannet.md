@@ -161,7 +161,10 @@ GANNET
   - owners of repos it recently pushed to;
   - once its full repo list has been fetched, any other owner in that list (a repo you collaborate on).
   *(builder's call)*
-- Order: each account's own node first, in account order, then the other owners by name. *(builder's call)*
+- Order: by owner name, then by account (`c3-e`, `c3-sahn`, `c3-taehokgil`, `seanahn`), as Sean listed them.
+  Owner names are compared ignoring case, as GitHub does. *(builder's call)*
+- If `/user/orgs` fails for an account (a token without `read:org`, say), its owners still come from its repos;
+  none of them starts expanded as an organization. *(builder's call)*
 - Repo names drop the owner: `c3reliability`, not `c3-e/c3reliability`. *(Sean)*
 - **Each owner node lists its recent repos, then an All repos link** that expands to every repo of that owner the
   account can reach. *(Sean: "per owner")* Recent per owner works as before (repos used in Gannet first, then
