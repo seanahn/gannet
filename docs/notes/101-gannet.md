@@ -1,7 +1,8 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0). How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0). How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
+Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 
 ## Intent
 
@@ -143,8 +144,10 @@ GANNET
     folder** where Gannet puts new clones: the folder most of its folders sit in, else the folder the file sits
     in; **Set repo folder…** changes it.
   - **Folder**: its repos are its subfolders, and new clones go inside it.
-- **The list** is kept per machine (in global state, which under Remote-SSH lives on the remote), so seclab and
-  the local machine each have their own. *(guess, not corrected)* This window's workspace is listed
+- **The list** is kept per machine, so seclab and the local machine each have their own. *(guess, not
+  corrected)* It lives in `machine.json` in Gannet's global storage folder, which under Remote-SSH is on the
+  remote; `globalState` is kept by the local client and shared by every machine, so it is not used for anything
+  tied to a machine. *(builder's call, after review)* This window's workspace is listed
   automatically, marked **● this window**, when it is a saved workspace file or a single folder. An untitled
   multi-root window is not listed; its node reads **Untitled workspace — save it to list it**. *(builder's call)*
 - **Expanding a workspace** lists its folders (a workspace file's folders; a folder's subfolders), each opening
@@ -239,13 +242,14 @@ Checking out into a workspace:
 - One clone at a time; a second **Check out** waits in a queue. Git clones into `<target>.gannet-partial-<pid>`
   (the window's process) and is renamed when it succeeds. On start Gannet removes the partial folders in the
   checkout folder whose window is gone, never one another window is still filling. *(builder's call)*
-- A checkout is kept in global state until it is in the workspace, so one cut off by an extension restart is
+- A checkout is kept in `machine.json` (with the process of the window doing it) until it is in its workspace, so one cut off by an extension restart is
   started again on the next start. *(builder's call, after review)*
 - After a successful clone, the folder is appended to the current workspace with
   `vscode.workspace.updateWorkspaceFolders`; no new window. *(Sean)* Note: adding a second folder to a
   single-folder window turns it into an untitled multi-root workspace, and VS Code restarts extensions when
   that happens; Gannet must cope with being restarted right after a checkout.
-- Where each repo was checked out is remembered (global state, per machine). On start Gannet also recognises
+- Where each repo was checked out is remembered (`machine.json`, per machine; 0.1.0's entries in global state
+  are carried over once, and those not on this machine's disk dropped). On start Gannet also recognises
   clones already sitting in the default folder by their `origin` URL, so repos cloned by hand show as local.
   A remembered folder that no longer exists **on disk** is forgotten (not one that is merely missing from the
   workspace, since right after a restart the workspace may not list it yet). If `updateWorkspaceFolders`
@@ -302,7 +306,14 @@ Rulings settled while planning the build, all builder's calls:
   on GitHub** and leaves Recent. Tree items carry no ids, since a repo shows under both Recent and All repos.
 - **Sign in** on a signed-out VS Code account runs VS Code's account picker. **Reveal in Explorer** reveals the
   folder in VS Code's explorer when it is a workspace folder, and in the system's file manager otherwise.
-- Workspaces (planned for 0.2.0):
+- Workspaces (0.2.0):
+  - An edit to a workspace file follows the file's own indentation (tabs, or the width of its spaces) and line
+    endings, so the lines it does not touch stay as they were.
+  - A new window resumes only the checkouts whose window is gone, so opening a workspace while a checkout runs
+    does not start it twice. An extension-host restart is a new process, so its cut-off checkouts are resumed.
+  - **Add folder…** refuses a folder that is itself a git repo, so Check out never clones inside a repo.
+  - On a workspace: an inline **Open in new window** button; **Open here** is not offered on this window's own
+    workspace; **Set repo folder…** only on workspace files.
   - Workspace files are edited with `jsonc-parser` (`modify` + `applyEdits`), Gannet's one runtime dependency,
     so comments, trailing commas and other settings survive. A folder already listed, in either absolute or
     relative form, is not added twice; `uri` entries (remote folders) are ignored.
@@ -314,6 +325,12 @@ Rulings settled while planning the build, all builder's calls:
 - Known gaps, left for later: the All repos count does not show; **More files** links break for branch names
   with `/`; mixed-case logins may not reopen `gannet:` editors after a restart; partial folders outside the
   default checkout folder and the listed workspaces' folders are not cleaned; logins are not validated before being written into git config.
+  From the Workspaces review: a workspace file starting with a byte-order mark cannot be read; after a fresh clone
+  that lands outside a folder workspace the note says "already checked out"; two checkouts of one repo into two
+  workspace files sharing a repo folder share one pending entry; drive-letter case is compared exactly on
+  Windows; a workspace file is written in place rather than through a temporary file; repo nodes in Workspaces do
+  not show **● local**; symlinked subfolders of a folder workspace are not listed; **New workspace…** with a name
+  already taken shows the system's error.
 
 ## Flows
 
@@ -348,12 +365,12 @@ Checking out, with the failures that matter most:
 ```
  User          Tree view          Accounts          git              Disk             Workspace
   |                |                  |               |                 |                  |
-  |-- Check out -->|  (Check out to…: folder picker first)               |                  |
+  |-- Check out -->|  (Check out to…: workspace list, or Other folder…)   |                  |
   |                |-- queue (one clone at a time)   |                 |                  |
   |                |-- token -------->|               |                 |                  |
   |                | [no token]  stop: signed-out error                 |                  |
   |                |<-- token --------|               |                 |                  |
-  |                |-- pick target: <repo>, else <owner>-<repo> -------->|                  |
+  |                |-- pick target in the workspace's repo folder ------>|                  |
   |                | [same repo already there]  remember + add, no clone|                  |
   |                |-- clone into <target>.gannet-partial-<pid> (auth in env) ->|            |
   |<-- progress notification with Cancel             |                 |                  |
@@ -362,7 +379,7 @@ Checking out, with the failures that matter most:
   |                |-- rename to <target> ------------------------------>|                  |
   |                |-- set repo's .git/config: push as <login> -------->|                  |
   |                |-- remember path; mark ● local   |                 |                  |
-  |                |-- updateWorkspaceFolders (append) ----------------------------------->|
+  |                |-- place in its workspace (this window: append) --------------------->|
   |                |                  |               |                 |  (extension host may restart)
   |<-- repo in Explorer, tree shows local files -----------------------------------------|
   |                | [refused]  note with Add to workspace             |                  |

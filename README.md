@@ -25,10 +25,27 @@ A **Gannet** icon in the activity bar opens one tree:
 - **Files.** Expanding a folder of a repo that is only on GitHub fetches just that folder. Files open read-only.
   Files over 10 MB offer **Open on GitHub** instead.
 
+## Workspaces
+
+The **Workspaces** view, above **Repos**, lists the places you keep repos on this machine:
+
+- a **workspace file** (`.code-workspace`): its folders are repos wherever they live; new clones go to its repo
+  folder — where most of its repos sit, or the folder you set with **Set Repo Folder…**;
+- a **folder** whose subfolders are the repos (a home folder on a remote machine, say); new clones go inside it.
+
+This window's workspace is listed by itself and marked **● this window** (one repo opened alone is not a
+workspace). **+** adds a workspace file or a folder, or creates a new workspace file. Clicking a workspace opens it
+in a new window; **Remove from List** forgets it and deletes nothing. Each machine has its own list. The design,
+with the reasons behind each rule: [docs/notes/101-gannet.md](docs/notes/101-gannet.md).
+
 ## Checking out
 
-**Check Out** (the cloud icon on a repo) clones into `~/github/<repo>` — or `~/github/<owner>-<repo>` if that name
-is taken — and adds the folder to the current workspace; no new window opens. **Check Out to…** picks another place.
+**Check Out** (the cloud icon on a repo) clones into this window's workspace: into its folder, or into a workspace
+file's repo folder and then adds it there. A window with no workspace uses `~/github/<repo>` (or
+`~/github/<owner>-<repo>` if that name is taken) and adds the folder to the window. No new window opens.
+**Check Out to…** lists your workspaces first, then **Other folder…**; checking out into another workspace writes
+it into that workspace's file and leaves this window alone. A repo already checked out on this machine is reused,
+never cloned twice.
 
 A checked-out repo is set up, in its own `.git/config` only, to push as the account you checked it out with:
 
