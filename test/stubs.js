@@ -61,7 +61,8 @@ class FileSystemError extends Error {
 }
 
 class TreeItem { constructor(label, collapsibleState) { this.label = label; this.collapsibleState = collapsibleState; } }
-class ThemeIcon { constructor(id) { this.id = id; } }
+class ThemeIcon { constructor(id, color) { this.id = id; this.color = color; } }
+class ThemeColor { constructor(id) { this.id = id; } }
 ThemeIcon.File = new ThemeIcon('file');
 ThemeIcon.Folder = new ThemeIcon('folder');
 
@@ -79,7 +80,7 @@ function fakeVscode(opts = {}) {
   const vs = {
     _rec: rec, _config: config, _sessionsChanged: sessionsChanged,
     accounts: opts.accounts || [], tokens: opts.tokens || {},
-    EventEmitter, Uri, FileSystemError, TreeItem, ThemeIcon,
+    EventEmitter, Uri, FileSystemError, TreeItem, ThemeIcon, ThemeColor,
     TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
     FileType: { Unknown: 0, File: 1, Directory: 2, SymbolicLink: 64 },
     ProgressLocation: { SourceControl: 1, Window: 10, Notification: 15 },

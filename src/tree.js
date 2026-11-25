@@ -1,9 +1,9 @@
 'use strict';
-// The Gannet view: one node per account, each with Recent and All repos; a repo lists its files from GitHub, a
+// The Gannet view: one node per owner an account reaches, each with its recent repos and All repos (the account's
+// full list, kept on disk once read); a repo lists its files from GitHub, a
 // folder at a time, until it is checked out, and from disk after. Errors show as items in place of what failed.
 const fs = require('fs');
 const path = require('path');
-const { MAX: RECENT_MAX } = require('./recent.js');
 const { isDir } = require('./localRepos.js');
 const { toUri } = require('./fsProvider.js');
 
@@ -31,28 +31,32 @@ function diskTreeItem(vs, node) {
   return it;
 }
 
+const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();   // GitHub names ignore case
+
 class GannetTree {
-  constructor({ vscode, accounts, clientFor, recent, local }) {
-    Object.assign(this, { vscode, accounts, clientFor, recent, local });
+  constructor({ vscode, accounts, clientFor, recent, local, cache, workspaces, home }) {
+    Object.assign(this, { vscode, accounts, clientFor, recent, local, cache, workspaces, home });
     this.changed = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.changed.event;
+    this.refreshedAt = 0;   // a kept list fetched before this is read again from GitHub when All repos opens
     this.clear();
   }
 
   clear() {
     this.pushed = new Map();    // login -> Repo[]
-    this.allRepos = new Map();  // login -> Repo[]
+    this.orgs = new Map();      // login -> string[]
+    this.full = new Map();      // login -> Repo[], read this session
     this.listings = new Map();  // login fullName path -> { entries, truncated }
   }
 
-  refresh() { this.clear(); this.changed.fire(undefined); }
+  refresh() { this.clear(); this.refreshedAt = Date.now(); this.changed.fire(undefined); }
 
   async getChildren(node) {
     try {
-      if (!node) return (await this.accounts.list()).map((account) => ({ kind: 'account', account }));
+      if (!node) return await this.owners();
       switch (node.kind) {
-        case 'account': return [{ kind: 'group', which: 'recent', account: node.account }, { kind: 'group', which: 'all', account: node.account }];
-        case 'group': return node.which === 'recent' ? await this.recentRepos(node.account) : await this.everyRepo(node.account);
+        case 'owner': return node.error ? [this.errorNode(node.error, node)] : await this.ownerChildren(node);
+        case 'group': return await this.everyRepo(node);
         case 'repo': return await this.repoChildren(node);
         case 'entry': return await this.remoteDir(node.account, node.repo, node.entry.path);
         case 'disk': return this.diskDir(node.path);
@@ -63,27 +67,78 @@ class GannetTree {
     }
   }
 
-  async recentRepos(account) {
-    const login = account.login;
+  async pushedOf(login) {
     if (!this.pushed.has(login)) this.pushed.set(login, await this.clientFor(login).listRepos({ sort: 'pushed', max: PUSHED_PAGE }));
-    const known = new Map((this.allRepos.get(login) || []).map((r) => [r.fullName, r]));
-    return this.recent.merge(login, this.pushed.get(login), known).slice(0, RECENT_MAX).map((repo) => ({ kind: 'repo', account, repo }));
+    return this.pushed.get(login);
   }
 
-  async everyRepo(account) {
-    const login = account.login;
-    if (!this.allRepos.has(login)) {
-      const repos = await this.clientFor(login).listRepos({ sort: 'full_name' });
-      this.allRepos.set(login, repos.slice().sort((a, b) => byName(a.fullName, b.fullName)));
-      this.changed.fire({ kind: 'account', account });   // the count on All repos
+  async orgsOf(login) {
+    if (!this.orgs.has(login)) {
+      let orgs = [];
+      try { orgs = await this.clientFor(login).listOrgs(); } catch { /* no read:org: owners come from the repos */ }
+      this.orgs.set(login, orgs);
     }
-    return this.allRepos.get(login).map((repo) => ({ kind: 'repo', account, repo }));
+    return this.orgs.get(login);
   }
 
-  localOf(repo) {
-    const l = this.local.get(repo.fullName);
-    return l && isDir(l.path) ? l : null;
+  /** The account's full list as far as known without asking GitHub: this session's, else the one kept on disk. */
+  knownList(login) {
+    if (this.full.has(login)) return this.full.get(login);
+    const kept = this.cache && this.cache.get(login);
+    return kept ? kept.repos : [];
   }
+
+  /** The full list for All repos: kept on disk once read; read again only after ⟳. */
+  async fullList(login) {
+    if (this.full.has(login)) return this.full.get(login);
+    const kept = this.cache && this.cache.get(login);
+    if (kept && !(Date.parse(kept.fetchedAt) < this.refreshedAt)) { this.full.set(login, kept.repos); return kept.repos; }
+    const repos = (await this.clientFor(login).listRepos({ sort: 'full_name' })).slice().sort((a, b) => byName(a.fullName, b.fullName));
+    if (this.cache) this.cache.set(login, repos);
+    this.full.set(login, repos);
+    return repos;
+  }
+
+  /** One node per owner each account reaches: its login, its organizations, and the owners of its repos. */
+  async owners() {
+    const out = [];
+    for (const account of await this.accounts.list()) {
+      const { login } = account;
+      let error = null, pushed = [], orgs = [];
+      try { pushed = await this.pushedOf(login); orgs = await this.orgsOf(login); } catch (e) { error = e; }
+      const found = new Map();   // lowercased -> { owner, org }
+      const add = (owner, org = false) => {
+        if (!owner) return;
+        const k = owner.toLowerCase();
+        if (!found.has(k)) found.set(k, { owner, org });
+        else if (org) found.get(k).org = true;
+      };
+      add(login);
+      if (!error) {
+        for (const o of orgs) add(o, true);
+        for (const r of pushed) add(r.owner);
+        for (const r of this.knownList(login)) add(r.owner);
+      }
+      for (const { owner, org } of found.values()) {
+        const own = same(owner, login);
+        out.push({ kind: 'owner', account, owner, own, org: org && !own, hasOrgs: orgs.length > 0, error: own ? error : null });
+      }
+    }
+    return out.sort((a, b) => byName(a.owner, b.owner) || byName(a.account.login, b.account.login));
+  }
+
+  async ownerChildren(node) {
+    const { account, owner } = node;
+    const known = new Map(this.knownList(account.login).map((r) => [r.fullName, r]));
+    const recent = this.recent.merge(account.login, await this.pushedOf(account.login), known, (r) => same(r.owner, owner));
+    return [...recent.map((repo) => ({ kind: 'repo', account, repo })), { kind: 'group', which: 'all', account, owner }];
+  }
+
+  async everyRepo(node) {
+    return (await this.fullList(node.account.login)).filter((r) => same(r.owner, node.owner)).map((repo) => ({ kind: 'repo', account: node.account, repo }));
+  }
+
+  localOf(repo) { return this.local.checkoutsOf(repo.fullName)[0] || null; }
 
   async repoChildren(node) {
     const here = this.localOf(node.repo);
@@ -123,7 +178,7 @@ class GannetTree {
       n.label = 'Signed out';
       return n;
     }
-    if (e && e.kind === 'sso') { n.label = `${(node.repo && node.repo.owner) || 'An organization'} needs SSO authorization`; return n; }
+    if (e && e.kind === 'sso') { n.label = `${(node && ((node.repo && node.repo.owner) || (node.owner !== undefined && !node.own && node.owner))) || 'An organization'} needs SSO authorization`; return n; }
     if (e && e.kind === 'rate') { const t = e.retryAt; n.label = t ? `Rate limited — try again at ${pad(t.getHours())}:${pad(t.getMinutes())}` : 'Rate limited — try again later'; return n; }
     n.label = (e && e.message) || String(e);
     return n;
@@ -132,26 +187,32 @@ class GannetTree {
   getTreeItem(node) {
     const vs = this.vscode, S = vs.TreeItemCollapsibleState;
     switch (node.kind) {
-      case 'account': {
-        const it = new vs.TreeItem(node.account.login, S.Expanded);
-        const gh = node.account.source === 'gh';
-        it.description = gh ? 'gh' : 'VS Code';
-        it.contextValue = gh ? 'account-gh' : 'account-vscode';
-        it.tooltip = gh ? `${node.account.login}, logged in with the gh CLI` : `${node.account.login}, signed in to VS Code. To sign out, use VS Code's Accounts menu; Hide only removes it from Gannet.`;
-        it.iconPath = new vs.ThemeIcon('account');
+      case 'owner': {
+        const { account, owner, own } = node;
+        const open = node.org || (own && (!node.hasOrgs || !!node.error));
+        const it = new vs.TreeItem(owner, open ? S.Expanded : S.Collapsed);
+        it.id = `owner:${account.login.toLowerCase()}:${owner.toLowerCase()}`;
+        if (!own) it.description = `via ${account.login}`;
+        const gh = account.source === 'gh';
+        it.contextValue = !own ? 'owner' : gh ? 'account-gh' : 'account-vscode';
+        it.tooltip = !own ? `${owner}, reached through ${account.login}`
+          : gh ? `${account.login}, logged in with the gh CLI` : `${account.login}, signed in to VS Code. To sign out, use VS Code's Accounts menu; Hide only removes it from Gannet.`;
+        it.iconPath = new vs.ThemeIcon(node.org ? 'organization' : 'account');
         return it;
       }
       case 'group': {
-        const recent = node.which === 'recent';
-        const it = new vs.TreeItem(recent ? 'Recent' : 'All repos', recent ? S.Expanded : S.Collapsed);
-        const all = this.allRepos.get(node.account.login);
-        if (!recent && all) it.description = String(all.length);
-        it.contextValue = recent ? 'group-recent' : 'group-all';
-        it.iconPath = new vs.ThemeIcon(recent ? 'history' : 'repo');
+        const it = new vs.TreeItem('All repos', S.Collapsed);
+        const login = node.account.login;
+        const all = this.full.get(login) || (this.cache && this.cache.get(login) ? this.cache.get(login).repos : null);
+        if (all) it.description = String(all.filter((r) => same(r.owner, node.owner)).length);
+        const kept = this.cache && this.cache.get(login);
+        it.tooltip = kept ? `Fetched ${new Date(kept.fetchedAt).toLocaleString()} — ⟳ fetches again` : 'Every repo of this owner the account can reach';
+        it.contextValue = 'group-all';
+        it.iconPath = new vs.ThemeIcon('repo');
         return it;
       }
       case 'repo': {
-        const it = new vs.TreeItem(node.repo.fullName, S.Collapsed);
+        const it = new vs.TreeItem(node.repo.name, S.Collapsed);
         const l = this.localOf(node.repo);
         it.description = [l && '● local', node.repo.private && 'private', node.repo.archived && 'archived'].filter(Boolean).join(' · ');
         it.contextValue = !l ? 'repo-remote' : l.login ? 'repo-local' : 'repo-local-foreign';
