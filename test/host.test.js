@@ -92,6 +92,16 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
     await vscode.commands.executeCommand('gannet.hideAccount', { kind: 'account', account });
     assert.deepStrictEqual(rec.configWrites.at(-1), { key: 'gannet.hiddenAccounts', v: ['seanahn'], target: vscode.ConfigurationTarget.Global });
 
+    // Hide owner writes its own setting; an account node is not an owner to hide
+    await vscode.commands.executeCommand('gannet.hideOwner', { kind: 'owner', account, owner: 'bpmn2', own: false });
+    assert.deepStrictEqual(rec.configWrites.at(-1), { key: 'gannet.hiddenOwners', v: ['bpmn2'], target: vscode.ConfigurationTarget.Global });
+    const writes = rec.configWrites.length;
+    await vscode.commands.executeCommand('gannet.hideOwner', { kind: 'owner', account, owner: 'seanahn', own: true });
+    await vscode.commands.executeCommand('gannet.hideOwner', { kind: 'owner', account, owner: 'BPMN2', own: false });
+    assert.strictEqual(rec.configWrites.length, writes, 'own login and an owner already hidden: no write');
+    const hideMenu = manifest.contributes.menus['webview/context'].find((m) => m.command === 'gannet.hideOwner');
+    assert.ok(/viewItem == owner\b/.test(hideMenu.when), hideMenu.when);
+
     // a file over 10 MB: a note with Open on GitHub, not opened
     const before = rec.executed.filter((e) => e.id === 'vscode.open').length;
     await vscode.commands.executeCommand('gannet.openFile', { kind: 'entry', account, repo, entry: { name: 'big.bin', path: 'big.bin', type: 'file', size: 11 * 1024 * 1024, htmlUrl: 'https://github.com/seanahn/perch/blob/main/big.bin' } });

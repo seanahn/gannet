@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34). How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -337,6 +337,9 @@ GANNET                               [+ account] [⟳]
   - owners: an organization or a person icon; repos: the Octocat, green when checked out; errors: a warning
     icon. *(as 0.3.0)*
   - icons are inline SVG in the page, like Perch's; no icon font or other dependency. *(builder's call)*
+  - the repo icon is codicon `github-alt` itself, copied into the page (CC BY 4.0, credited in the code), the cat
+    with no circle; 0.4.0 shipped a hand-drawn round GitHub mark by mistake. *(Sean: "somehow the circle on cat icon
+    is back")*
 - **A repo's tooltip does not repeat its name** (the row shows it). A repo only on GitHub says **Only on GitHub**; a
   checked-out one has a line per checkout: its path, its branch (`detached at <sha>` when no branch is checked
   out), and `pushes as <login>` when it pushes as an account, e.g. `/home/jovyan/c3nexus · main · pushes as
@@ -354,7 +357,14 @@ GANNET                               [+ account] [⟳]
 - **Expansion is remembered** per row, across hiding the sidebar and reloading the window. *(builder's call)*
 - **Clicking** a row does what clicking its tree item did: open a file, open on GitHub, sign in, and so on.
   Clicking a row with children toggles it. *(builder's call)*
-- **The cloud button** (Check out) shows on hover on a repo not checked out, as the inline button did. *(as 0.3.0)*
+- **The cloud button** shows on hover on every repo row. On a repo not checked out it is **Check Out**; on one
+  already checked out it is **Check Out Another Copy**, which runs the same Check Out: the quick pick of workspaces,
+  with the next free folder name and Other folder…. *(Sean: "even if the repo is already checked out, the checkout
+  icon should show up to checkout as a different folder"; 0.4.0 first had it only on repos not checked out)*
+- **Hide Owner** (right-click an organization or another owner, the rows shown `via <account>`) leaves that owner
+  out under every account, matched without case, and adds it to the `gannet.hiddenOwners` setting; editing the
+  setting brings it back. An account's own login is not an owner to hide: **Hide Account** does that. *(Sean: "add
+  a way to hide for example bpmn2"; builder's calls on the setting and its scope)*
 - **Right-click** shows VS Code's own context menu with the same entries, on the same kinds of row, as 0.3.0's
   tree: Check out, Check out to…, Reveal, Add to window, Push as, Open on GitHub, Hide account. VS Code's default
   Cut/Copy/Paste entries are left out. *(builder's call: native menus, so commands and their conditions are

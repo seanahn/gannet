@@ -76,7 +76,7 @@ function fakeVscode(opts = {}) {
   const sessionsChanged = new EventEmitter();
   const configChanged = new EventEmitter();
   const foldersChanged = new EventEmitter();
-  const config = Object.assign({ 'gannet.checkoutFolder': '~/github', 'gannet.hiddenAccounts': [] }, opts.config || {});
+  const config = Object.assign({ 'gannet.checkoutFolder': '~/github', 'gannet.hiddenAccounts': [], 'gannet.hiddenOwners': [] }, opts.config || {});
   const rec = { quickPicks: [], inputBoxes: [], messages: [], opened: [], commands: new Map(), executed: [], providers: [], trees: [], webviews: [], folderUpdates: [], sessionCalls: [], configWrites: [], progress: [] };
   const vs = {
     _rec: rec, _config: config, _sessionsChanged: sessionsChanged,

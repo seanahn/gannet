@@ -83,6 +83,10 @@ const S = vscode.TreeItemCollapsibleState;
     const c3e = await ownerNode('c3-e');
     assert.deepStrictEqual(await labels((await tree.getChildren(c3e)).at(-1)), ['hub', 'zeta']);
 
+    // Hide owner: an organization or another owner is left out (any case); an account's own login is not
+    const th = make({ hiddenOwners: () => ['C3-E', 'seanahn'] });
+    assert.deepStrictEqual(await labels(undefined, th), ['c3-sahn', 'c3-taehokgil', 'seanahn', 'zz']);
+
     // a new window (another tree on the same folder): owners found only in the kept list show, with no fetch
     const t2 = make();
     assert.deepStrictEqual(await labels(undefined, t2), ['c3-e', 'c3-sahn', 'c3-taehokgil', 'seanahn', 'zz']);

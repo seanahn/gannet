@@ -2,7 +2,7 @@
   "name": "gannet",
   "displayName": "Gannet",
   "description": "Your GitHub repos as a tree: browse files without cloning, check out into your workspace, push as the right account.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "publisher": "seanahn",
   "license": "MIT",
   "repository": {
@@ -65,6 +65,11 @@
       {
         "command": "gannet.hideAccount",
         "title": "Hide Account",
+        "category": "Gannet"
+      },
+      {
+        "command": "gannet.hideOwner",
+        "title": "Hide Owner",
         "category": "Gannet"
       },
       {
@@ -135,6 +140,10 @@
       "commandPalette": [
         {
           "command": "gannet.hideAccount",
+          "when": "false"
+        },
+        {
+          "command": "gannet.hideOwner",
           "when": "false"
         },
         {
@@ -229,6 +238,11 @@
           "command": "gannet.hideAccount",
           "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem =~ /^account-/",
           "group": "1_account@1"
+        },
+        {
+          "command": "gannet.hideOwner",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem == owner",
+          "group": "1_account@2"
         }
       ]
     },
@@ -242,6 +256,14 @@
           },
           "default": [],
           "description": "GitHub logins Gannet does not show. Hiding never signs an account out of gh or VS Code."
+        },
+        "gannet.hiddenOwners": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Organizations and other owners not shown (right-click one and choose Hide Owner). An account's own login is hidden with gannet.hiddenAccounts."
         }
       }
     }

@@ -31,7 +31,8 @@ GANNET                               [+ account] [⟳]
 - **Owners.** Each account you are signed in to, each organization it belongs to, and every other owner it can
   reach repos of (shown `via <account>`) is a top-level row. Organizations start expanded; an account that belongs
   to organizations starts collapsed. **+** adds a VS Code account; **Hide Account** (right-click an account) keeps
-  one out of the list and never signs anything out.
+  one out of the list and never signs anything out; **Hide Owner** (right-click an organization or a `via` owner)
+  keeps that owner out.
 - **Recent repos.** Under an owner come up to 10 repos: the ones you opened or checked out in Gannet first, then
   GitHub's recently pushed. Then **All repos**: every repo of that owner the account can reach. The account's full
   list is fetched once and kept on disk, so later starts and other windows show it at once; its tooltip says when
@@ -43,7 +44,7 @@ GANNET                               [+ account] [⟳]
   GitHub fetches just that folder. Files open read-only. Files over 10 MB offer **Open on GitHub** instead.
 - **Using it.** Clicking a row opens or toggles it; what is expanded is remembered across reloads. Right-click a
   row for its menu (Check Out, Check Out to…, Reveal, Add to Window, Push as This Account, Open on GitHub, Hide
-  Account). With the list focused, Up/Down move, Right/Left expand and collapse, Enter or Space clicks.
+  Account, Hide Owner). With the list focused, Up/Down move, Right/Left expand and collapse, Enter or Space clicks.
 
 ## Workspaces
 
@@ -57,7 +58,8 @@ plus `~/github` if it exists. The design, with the reasons behind each rule:
 
 ## Checking out
 
-**Check Out** (the cloud icon on a repo, or right-click) clones the repo:
+**Check Out** (the cloud icon on a repo, or right-click) clones the repo; on a repo already checked out the
+cloud icon is **Check Out Another Copy**:
 
 - with **no workspace yet**, it asks where Gannet should check out repos — `~/github` or a folder you choose — and
   adds that directory to Workspaces;
@@ -86,6 +88,7 @@ Under Remote-SSH, Gannet runs on the remote machine: checkouts land there, with 
 | Setting | Default | |
 |---|---|---|
 | `gannet.hiddenAccounts` | `[]` | Logins not shown. |
+| `gannet.hiddenOwners` | `[]` | Organizations and other owners not shown. |
 
 ## Development
 

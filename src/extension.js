@@ -69,7 +69,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   };
   const checkout = createCheckout({ run, local, accounts, helperCommand, home });
 
-  const tree = new GannetTree({ vscode, accounts, clientFor, recent, local, cache: createRepoCache(store), workspaces, home });
+  const tree = new GannetTree({ vscode, accounts, clientFor, recent, local, cache: createRepoCache(store), workspaces, home, hiddenOwners: () => settings().get('hiddenOwners', []) });
   const gfs = new GannetFs({ vscode, clientFor, accounts });
   const sidebar = new GannetSidebar({ vscode, tree, workspaces, home, extensionUri: context.extensionUri || vscode.Uri.file(context.extensionPath) });
   const refreshAll = () => { tree.redraw(); sidebar.refreshWorkspaces(); };   // only ⟳ reads the repo lists again
@@ -189,6 +189,12 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
       const hidden = settings().get('hiddenAccounts', []) || [];
       if (!hidden.includes(node.account.login)) await settings().update('hiddenAccounts', [...hidden, node.account.login], vscode.ConfigurationTarget.Global);
     },
+    'gannet.hideOwner': async (node) => {
+      if (!node || node.kind !== 'owner' || node.own || !node.owner) return;
+      const hidden = settings().get('hiddenOwners', []) || [];
+      if (hidden.some((o) => String(o).toLowerCase() === node.owner.toLowerCase())) return;
+      await settings().update('hiddenOwners', [...hidden, node.owner], vscode.ConfigurationTarget.Global);
+    },
     'gannet.checkout': async (node) => {
       if (!node || !node.repo) return;
       const dir = await whereTo(node.repo);
@@ -253,7 +259,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   })();
 }
 
-const NODE_COMMANDS = new Set(['gannet.checkout', 'gannet.checkoutTo', 'gannet.openOnGitHub', 'gannet.revealLocal', 'gannet.addToWorkspace', 'gannet.pushAs', 'gannet.hideAccount', 'gannet.signIn']);
+const NODE_COMMANDS = new Set(['gannet.checkout', 'gannet.checkoutTo', 'gannet.openOnGitHub', 'gannet.revealLocal', 'gannet.addToWorkspace', 'gannet.pushAs', 'gannet.hideAccount', 'gannet.hideOwner', 'gannet.signIn']);
 
 function activate(context) { return activateWith(context); }
 

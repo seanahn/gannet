@@ -38,7 +38,8 @@ const checkoutLine = (c) => [c.path, branchOf(c.path), c.login && `pushes as ${c
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();   // GitHub names ignore case
 
 class GannetTree {
-  constructor({ vscode, accounts, clientFor, recent, local, cache, workspaces, home }) {
+  constructor({ vscode, accounts, clientFor, recent, local, cache, workspaces, home, hiddenOwners = () => [] }) {
+    this.hiddenOwners = hiddenOwners;
     Object.assign(this, { vscode, accounts, clientFor, recent, local, cache, workspaces, home });
     this.changed = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.changed.event;
@@ -128,8 +129,10 @@ class GannetTree {
         for (const r of pushed) add(r.owner);
         for (const r of this.knownList(login)) add(r.owner);
       }
+      const hide = new Set((this.hiddenOwners() || []).map((o) => String(o).toLowerCase()));
       for (const { owner, org } of found.values()) {
         const own = same(owner, login);
+        if (!own && hide.has(owner.toLowerCase())) continue;
         out.push({ kind: 'owner', account, owner, own, org: org && !own, hasOrgs: orgs.length > 0, error: own ? error : null });
       }
     }
