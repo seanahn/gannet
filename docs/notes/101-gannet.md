@@ -1,6 +1,7 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Design, 2026-11-25. Not built yet.
+Built, 2026-11-25 (0.1.0). How to build, install and use it: [README.md](../../README.md).
+Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 
 ## Intent
 
@@ -122,9 +123,10 @@ GANNET                                   [+ account] [⟳]
   that folder is taken by a different repo, `<folder>/<owner>-<repo>`. *(Sean: one folder by default;
   builder's call on the name and on clashes)*
 - **Check out to…:** a folder picker; the repo is cloned into `<picked>/<repo>`.
-- Cloning runs `git clone` with the account's token passed for that one command
-  (`git -c http.extraHeader="Authorization: Basic …" clone https://github.com/<owner>/<repo>.git`), so the token
-  never lands in `.git/config`. The remote stays a plain https URL. *(builder's call)*
+- Cloning runs `git clone https://github.com/<owner>/<repo>.git` with the account's token passed for that one
+  command in git's environment (`GIT_CONFIG_COUNT`/`KEY`/`VALUE`), never on the command line where other users
+  of the machine could read it, and never in `.git/config`. The remote stays a plain https URL. *(builder's
+  call; moved off the command line after review)*
 - **The repo pushes as the account it came from.** *(Sean)* After the clone, Gannet writes, in that repo's
   `.git/config` only:
   - `credential.https://github.com.helper` first set empty (so the machine's helpers are skipped for this repo),
@@ -143,9 +145,11 @@ GANNET                                   [+ account] [⟳]
   just remembered and added; anything else picks the `<owner>-<repo>` name, and if that is taken too, asks for a
   location.
 - Progress shows in a notification with **Cancel**; cancelling stops git and removes the partial folder.
-- One clone at a time; a second **Check out** waits in a queue. Git clones into `<target>.gannet-partial` and is
-  renamed when it succeeds, so a clone cut off by an extension restart leaves only a `.gannet-partial` folder,
-  which Gannet removes on start. *(builder's call)*
+- One clone at a time; a second **Check out** waits in a queue. Git clones into `<target>.gannet-partial-<pid>`
+  (the window's process) and is renamed when it succeeds. On start Gannet removes the partial folders in the
+  checkout folder whose window is gone, never one another window is still filling. *(builder's call)*
+- A checkout is kept in global state until it is in the workspace, so one cut off by an extension restart is
+  started again on the next start. *(builder's call, after review)*
 - After a successful clone, the folder is appended to the current workspace with
   `vscode.workspace.updateWorkspaceFolders`; no new window. *(Sean)* Note: adding a second folder to a
   single-folder window turns it into an untitled multi-root workspace, and VS Code restarts extensions when
@@ -180,19 +184,36 @@ Rulings settled while planning the build, all builder's calls:
 - A folder of more than 1,000 entries (GitHub's contents API limit) ends with an item **More files — open on
   GitHub**. An empty repo expands to **Empty repository** and can still be checked out. Submodules and symlinks
   do not expand; a submodule opens its repo on GitHub.
-- Clone sign-in is `http.extraHeader=Authorization: Basic base64("x-access-token:<token>")` on the command line
-  only; git's error line is shown with that value masked.
+- Clone sign-in is `http.https://github.com/.extraHeader=Authorization: Basic base64("x-access-token:<token>")`
+  plus `credential.helper=` (so a refused token fails instead of quietly cloning as gh's active account), both in
+  git's environment; git's error line is shown with the token masked. Needs git ≥ 2.31.
 - A gh account's push helper, in the repo's `.git/config`:
   `!f() { test "$1" = get || exit 0; echo username=<login>; echo password=$(gh auth token --hostname github.com --user <login>); }; f`.
 - A VS Code account's push helper is `!"<shim>" <login>`. The shim, `gannet-credential` in Gannet's global
   storage folder (a path that survives updates), is rewritten on every start to run the current VS Code's own
   Node (`ELECTRON_RUN_AS_NODE=1 <execPath>`) on `bin/gannet-credential.js`. Every VS Code window serves its own
-  socket, `token-<pid>.sock` (0600, in a 0700 folder; under the temp folder if the path would be too long; a
-  named pipe on Windows); the helper tries each and removes dead ones. The line protocol is `<login>` in,
-  `ok <token>` or `err <message>` out.
+  socket, `token-<pid>.sock` (0600, in `<global storage>/sockets`, 0700; under the temp folder if the path would
+  be too long); the helper tries each, moving past a window that does not hold the account, and removes dead
+  ones. The line protocol is `<login>` in, `ok <token>` or `err <message>` out.
+- When the window cannot serve tokens — the socket fails, or on **Windows**, where this is not supported — a
+  VS Code account's checkout gets no push settings at all (a warning says so) and is remembered with no account,
+  so it uses the usual git sign-in and offers **Push as** later. gh accounts work everywhere.
 - Repos found on disk but not cloned by Gannet are remembered with no account, and offer **Push as <login>**.
   Checking out a repo already local, from any account, only adds it to the workspace and keeps its push account.
 - Hidden accounts are written to the user (global) settings.
+- GitHub reports an empty repo's root as 404 "This repository is empty." (not 409), and lists a submodule inside
+  a folder as a `file` with no `download_url`; both are recognised.
+- **Push as** can be run again on a repo already set up: it clears the earlier helpers first. Repo names are
+  matched without regard to case.
+- A refused token is dropped from memory, and ⟳ drops every cached token, so `gh auth login` then ⟳ is enough.
+- Recent's pool is one page (100) of GitHub's recently pushed repos plus All repos once opened; a repo used in
+  Gannet but in neither is not shown until All repos is opened. A repo GitHub answers 404 for shows **No longer
+  on GitHub** and leaves Recent. Tree items carry no ids, since a repo shows under both Recent and All repos.
+- **Sign in** on a signed-out VS Code account runs VS Code's account picker. **Reveal in Explorer** reveals the
+  folder in VS Code's explorer when it is a workspace folder, and in the system's file manager otherwise.
+- Known gaps, left for later: the All repos count does not show; **More files** links break for branch names
+  with `/`; mixed-case logins may not reopen `gannet:` editors after a restart; partial folders outside the
+  default checkout folder are not cleaned; logins are not validated before being written into git config.
 
 ## Flows
 
@@ -234,7 +255,7 @@ Checking out, with the failures that matter most:
   |                |<-- token --------|               |                 |                  |
   |                |-- pick target: <repo>, else <owner>-<repo> -------->|                  |
   |                | [same repo already there]  remember + add, no clone|                  |
-  |                |-- clone into <target>.gannet-partial (one-off auth header) ->|           |
+  |                |-- clone into <target>.gannet-partial-<pid> (auth in env) ->|            |
   |<-- progress notification with Cancel             |                 |                  |
   |                | [success]        |               |                 |                  |
   |                |<-- exit 0 -------------------------|               |                  |
@@ -247,9 +268,9 @@ Checking out, with the failures that matter most:
   |                | [refused]  note with Add to workspace             |                  |
   |                | [failure / Cancel]               |                 |                  |
   |                |<-- error line / killed -----------|               |                  |
-  |                |-- remove <target>.gannet-partial ------------------>|                  |
+  |                |-- remove <target>.gannet-partial-<pid> ------------>|                  |
   |<-- notification with git's error                |                 |                  |
-  |                | [cut off by a restart]  on next start, leftover .gannet-partial removed|
+  |                | [cut off by a restart]  next start: dead window's partial removed, checkout resumed
 ```
 
 ## Left to the builder
