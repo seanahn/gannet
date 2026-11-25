@@ -22,6 +22,7 @@ const manifest = require('../package.json');
     const bare = path.join(tmp, 'perch.git');
     sh(`git clone -q --bare "${src}" "${bare}"`, tmp);
 
+    fs.mkdirSync(path.join(tmp, 'ws', '.git'), { recursive: true });   // one repo opened alone: not a workspace
     const opts = { folders: [path.join(tmp, 'ws')], openDialog: [path.join(tmp, 'picked')] };
     const vscode = fakeVscode(opts);
     installVscode(vscode);
@@ -61,11 +62,14 @@ const manifest = require('../package.json');
 
     // Check out to…: into the picked folder; VS Code refusing the folder offers Add to workspace
     opts.refuseFolders = true;
+    opts.quickPick = (items) => items.find((i) => i.other);
     await vscode.commands.executeCommand('gannet.checkoutTo', { kind: 'repo', account, repo: { ...repo, fullName: 'seanahn/roost', name: 'roost' } });
     assert.ok(fs.existsSync(path.join(tmp, 'picked', 'roost', 'a.txt')));
     const refused = rec.messages.at(-1);
     assert.ok(refused.items.includes('Add to workspace'), JSON.stringify(refused));
     opts.refuseFolders = false;
+    opts.quickPick = undefined;
+    assert.deepStrictEqual(context.globalState.get('gannet.workspaces', []), [], 'a repo window is not listed');
 
     // a failing clone: git's line, nothing left behind
     await vscode.commands.executeCommand('gannet.checkout', { kind: 'repo', account, repo: { ...repo, fullName: 'seanahn/nope', name: 'nope', cloneUrl: path.join(tmp, 'missing.git') } });
@@ -122,6 +126,143 @@ const manifest = require('../package.json');
       assert.strictEqual(helpers, '', 'no helper written when it cannot work');
       assert.strictEqual(ext._state().local.get('seanahn/later').login, null, 'so the tree offers Push as later');
       assert.ok(rec.messages.some((m) => /cannot push as vsuser/.test(m.msg)), JSON.stringify(rec.messages.map((m) => m.msg)));
+      await ext.deactivate();
+    }
+    // ---- Workspaces ----
+    const W = require('../src/workspaces.js');
+    const R = (name) => ({ ...repo, fullName: 'seanahn/' + name, name });
+    const ckout = (name) => vscode.commands.executeCommand('gannet.checkout', { kind: 'repo', account, repo: R(name) });
+    const ckoutTo = (name) => vscode.commands.executeCommand('gannet.checkoutTo', { kind: 'repo', account, repo: R(name) });
+    const t = path.join(tmp, 'w3');
+    const G = path.join(t, 'git');
+    fs.mkdirSync(path.join(G, 'a'), { recursive: true });
+    fs.mkdirSync(path.join(G, 'old.gannet-partial-999999999'));
+    fs.mkdirSync(path.join(t, 'ws'));
+    const main = path.join(t, 'ws', 'main.code-workspace');
+    fs.writeFileSync(main, JSON.stringify({ folders: [{ path: '../git/a' }] }));
+    const mkFile = (name) => { fs.mkdirSync(path.join(t, name), { recursive: true }); const f = path.join(t, name, name + '.code-workspace'); fs.writeFileSync(f, '{ "folders": [] }'); return f; };
+    const ctx = (state = {}) => ({ globalState: makeMemento(state), subscriptions: [], globalStorageUri: Uri.file(path.join(t, 'store')), extensionPath: path.join(__dirname, '..') });
+
+    // a window with a workspace file: listed, both views registered (Workspaces first), its repo folder cleaned
+    {
+      opts.workspaceFile = main;
+      opts.folders = [path.join(G, 'a')];
+      const c3 = ctx();
+      const before = rec.trees.length;
+      await ext.activateWith(c3, { run, fetch, home });
+      const ids = rec.trees.slice(before).map((x) => x.id);
+      assert.ok(ids.indexOf('gannet.workspaces') >= 0 && ids.indexOf('gannet.workspaces') < ids.indexOf('gannet.repos'), JSON.stringify(ids));
+      assert.deepStrictEqual(c3.globalState.get('gannet.workspaces').map((w) => w.path), [main]);
+      assert.ok(!fs.existsSync(path.join(G, 'old.gannet-partial-999999999')), 'partials cleaned in the repo folder');
+
+      // Check out: into the repo folder (/git here), added to this window
+      const ups = rec.folderUpdates.length;
+      await ckout('mainrepo');
+      assert.ok(fs.existsSync(path.join(G, 'mainrepo', 'a.txt')));
+      assert.strictEqual(rec.folderUpdates.length, ups + 1);
+      assert.strictEqual(rec.folderUpdates.at(-1).adds[0].uri.fsPath, path.join(G, 'mainrepo'));
+
+      // Check out to… another workspace file: cloned there, written into that file, this window unchanged
+      const other = mkFile('other');
+      await ext._state().workspaces.add({ kind: 'file', path: other });
+      await ext._state().workspaces.add({ kind: 'file', path: path.join(t, 'missing.code-workspace') });
+      opts.quickPick = (items) => items.find((i) => i.label === 'other');
+      await ckoutTo('otherrepo');
+      const picked = rec.quickPicks.at(-1).items.map((i) => i.label);
+      assert.ok(!picked.includes('missing'), 'Missing workspaces are not offered');
+      assert.strictEqual(picked[0], 'main', "this window's first");
+      assert.strictEqual(picked.at(-1), 'Other folder…');
+      assert.ok(fs.existsSync(path.join(t, 'other', 'otherrepo', 'a.txt')));
+      assert.ok(W.readFolders(other).includes(path.join(t, 'other', 'otherrepo')));
+      assert.strictEqual(rec.folderUpdates.length, ups + 1, 'this window unchanged');
+
+      // the same repo into a third workspace: the copy is reused, not cloned again
+      const third = mkFile('third');
+      await ext._state().workspaces.add({ kind: 'file', path: third });
+      opts.quickPick = (items) => items.find((i) => i.label === 'third');
+      await ckoutTo('otherrepo');
+      assert.ok(!fs.existsSync(path.join(t, 'third', 'otherrepo')), 'no second copy');
+      assert.ok(W.readFolders(third).includes(path.join(t, 'other', 'otherrepo')));
+
+      // the target file gone by the time the clone is done: the clone stays, a warning names both (Review Focus 5)
+      const fourth = mkFile('fourth');
+      await ext._state().workspaces.add({ kind: 'file', path: fourth });
+      opts.quickPick = (items) => { const i = items.find((x) => x.label === 'fourth'); fs.rmSync(fourth); return i; };
+      await ckoutTo('fourthrepo');
+      assert.ok(fs.existsSync(path.join(t, 'fourth', 'fourthrepo', 'a.txt')));
+      const warn = rec.messages.at(-1);
+      assert.strictEqual(warn.level, 'warning');
+      assert.ok(warn.msg.includes(path.join(t, 'fourth', 'fourthrepo')) && warn.msg.includes(fourth), warn.msg);
+      opts.quickPick = undefined;
+      await ext.deactivate();
+    }
+
+    // a folder window: listed; Check out clones inside it and adds nothing to the window
+    const homeWs = path.join(t, 'home');
+    fs.mkdirSync(homeWs);
+    {
+      opts.workspaceFile = undefined;
+      opts.folders = [homeWs];
+      const c4 = ctx();
+      await ext.activateWith(c4, { run, fetch, home });
+      assert.ok(c4.globalState.get('gannet.workspaces').some((w) => w.path === homeWs && w.kind === 'folder'));
+      const ups = rec.folderUpdates.length;
+      await ckout('homerepo');
+      assert.ok(fs.existsSync(path.join(homeWs, 'homerepo', 'a.txt')));
+      assert.strictEqual(rec.folderUpdates.length, ups, 'already inside the folder');
+      await ext.deactivate();
+    }
+
+    // a checkout cut off by a restart finishes into its workspace, never this window
+    {
+      const other = path.join(t, 'other', 'other.code-workspace');
+      const c5 = ctx({ 'gannet.pending': [{ repo: R('later2'), account, folder: path.join(t, 'other'), workspace: { kind: 'file', path: other, name: 'other' } }] });
+      const ups = rec.folderUpdates.length;
+      await ext.activateWith(c5, { run, fetch, home });
+      await ext._state().resumed;
+      assert.ok(W.readFolders(other).includes(path.join(t, 'other', 'later2')));
+      assert.strictEqual(rec.folderUpdates.length, ups);
+
+      // + : New workspace…, Add folder…, a repo folder refused; Remove, Open, Open here, Set repo folder
+      const ws = ext._state().workspaces;
+      fs.mkdirSync(path.join(t, 'new'));
+      opts.quickPick = (items) => items.find((i) => i.label === 'New workspace…');
+      opts.inputBox = 'team';
+      opts.openDialog = [path.join(t, 'new')];
+      await vscode.commands.executeCommand('gannet.addWorkspace');
+      const team = path.join(t, 'new', 'team.code-workspace');
+      assert.ok(fs.existsSync(team));
+      assert.ok(ws.get(team), 'listed');
+      fs.mkdirSync(path.join(t, 'fold'));
+      opts.quickPick = (items) => items.find((i) => i.label === 'Add folder…');
+      opts.openDialog = [path.join(t, 'fold')];
+      await vscode.commands.executeCommand('gannet.addWorkspace');
+      assert.strictEqual(ws.get(path.join(t, 'fold')).kind, 'folder');
+      opts.openDialog = [path.join(homeWs, 'homerepo')];
+      await vscode.commands.executeCommand('gannet.addWorkspace');
+      assert.strictEqual(ws.get(path.join(homeWs, 'homerepo')), undefined, 'a repo is not a workspace');
+      assert.strictEqual(rec.messages.at(-1).level, 'error');
+      opts.quickPick = (items) => items.find((i) => i.label === 'Add workspace file…');
+      const third = path.join(t, 'third', 'third.code-workspace');
+      opts.openDialog = [third];
+      await vscode.commands.executeCommand('gannet.addWorkspace');
+      assert.ok(ws.get(third));
+      const node = { kind: 'workspace', ws: ws.get(team) };
+      await vscode.commands.executeCommand('gannet.openWorkspace', node);
+      let ex = rec.executed.at(-1);
+      assert.strictEqual(ex.id, 'vscode.openFolder');
+      assert.strictEqual(ex.args[0].fsPath, team);
+      assert.deepStrictEqual(ex.args[1], { forceNewWindow: true });
+      await vscode.commands.executeCommand('gannet.openWorkspaceHere', node);
+      assert.deepStrictEqual(rec.executed.at(-1).args[1], { forceNewWindow: false });
+      opts.openDialog = [path.join(t, 'rf')];
+      fs.mkdirSync(path.join(t, 'rf'));
+      await vscode.commands.executeCommand('gannet.setRepoFolder', node);
+      assert.strictEqual(ws.get(team).repoFolder, path.join(t, 'rf'));
+      await vscode.commands.executeCommand('gannet.removeWorkspace', node);
+      assert.strictEqual(ws.get(team), undefined);
+      assert.ok(fs.existsSync(team), 'nothing deleted');
+      opts.quickPick = undefined; opts.inputBox = undefined;
       await ext.deactivate();
     }
     console.log('HOST OK');

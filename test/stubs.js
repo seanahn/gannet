@@ -65,13 +65,15 @@ class ThemeIcon { constructor(id) { this.id = id; } }
 
 /**
  * A fake vscode module. opts.accounts: VS Code GitHub accounts [{ id, label }]; opts.tokens: { label: token };
- * opts.config: settings by full key; opts.folders: workspace folder paths.
+ * opts.config: settings by full key; opts.folders: workspace folder paths; opts.workspaceFile: a path or 'untitled';
+ * opts.quickPick(items, o) and opts.inputBox answer those prompts.
  */
 function fakeVscode(opts = {}) {
   const sessionsChanged = new EventEmitter();
   const configChanged = new EventEmitter();
+  const foldersChanged = new EventEmitter();
   const config = Object.assign({ 'gannet.checkoutFolder': '~/github', 'gannet.hiddenAccounts': [] }, opts.config || {});
-  const rec = { messages: [], opened: [], commands: new Map(), executed: [], providers: [], trees: [], folderUpdates: [], sessionCalls: [], configWrites: [], progress: [] };
+  const rec = { quickPicks: [], inputBoxes: [], messages: [], opened: [], commands: new Map(), executed: [], providers: [], trees: [], folderUpdates: [], sessionCalls: [], configWrites: [], progress: [] };
   const vs = {
     _rec: rec, _config: config, _sessionsChanged: sessionsChanged,
     accounts: opts.accounts || [], tokens: opts.tokens || {},
@@ -97,7 +99,10 @@ function fakeVscode(opts = {}) {
       },
       onDidChangeSessions: sessionsChanged.event,
     },
+    _foldersChanged: foldersChanged,
     workspace: {
+      get workspaceFile() { return opts.workspaceFile === 'untitled' ? Uri.parse('untitled:Untitled-1') : opts.workspaceFile ? Uri.file(opts.workspaceFile) : undefined; },
+      onDidChangeWorkspaceFolders: foldersChanged.event,
       get workspaceFolders() { return (opts.folders || []).map((p, index) => ({ uri: Uri.file(p), name: require('path').basename(p), index })); },
       updateWorkspaceFolders: (start, del, ...adds) => {
         rec.folderUpdates.push({ start, del, adds });
@@ -116,6 +121,8 @@ function fakeVscode(opts = {}) {
       showInformationMessage: async (msg, ...items) => { rec.messages.push({ level: 'info', msg, items }); return opts.pick ? opts.pick(msg, items) : undefined; },
       showErrorMessage: async (msg, ...items) => { rec.messages.push({ level: 'error', msg, items }); return opts.pick ? opts.pick(msg, items) : undefined; },
       showWarningMessage: async (msg, ...items) => { rec.messages.push({ level: 'warning', msg, items }); return opts.pick ? opts.pick(msg, items) : undefined; },
+      showQuickPick: async (items, o) => { const its = await items; rec.quickPicks.push({ items: its, opts: o }); return opts.quickPick ? opts.quickPick(its, o) : undefined; },
+      showInputBox: async (o) => { rec.inputBoxes.push(o); return typeof opts.inputBox === 'function' ? opts.inputBox(o) : opts.inputBox; },
       showOpenDialog: async (o) => { rec.openDialog = o; return opts.openDialog ? opts.openDialog.map((p) => Uri.file(p)) : undefined; },
       withProgress: async (o, task) => { rec.progress.push(o); const cancel = new EventEmitter(); const token = { isCancellationRequested: false, onCancellationRequested: cancel.event }; vs._cancel = () => { token.isCancellationRequested = true; cancel.fire(); }; return task({ report: () => {} }, token); },
       registerTreeDataProvider: (id, provider) => { rec.trees.push({ id, provider }); return { dispose() {} }; },
