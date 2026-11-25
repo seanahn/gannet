@@ -23,10 +23,45 @@ const repo = (fullName) => ({ fullName, owner: fullName.split('/')[0], name: ful
   const merged = recent.merge('sean', pushed, known);
   assert.deepStrictEqual(merged.map((r) => r.fullName), ['a/one', 'a/two', 'p/1', 'p/2', 'p/3', 'p/4', 'p/5', 'p/6', 'p/7', 'p/8'], 'a/gone is no longer listed by GitHub');
   assert.deepStrictEqual(recent.merge('other', pushed.slice(0, 2), new Map()).map((r) => r.fullName), ['p/1', 'a/two'], 'per account');
-  for (let i = 0; i < 15; i++) recent.touch('sean', 'x/' + i);
-  assert.strictEqual(memento.get('gannet.recent').sean.length, 10, 'capped at 10');
+  for (let i = 0; i < 60; i++) recent.touch('sean', 'x/' + i);
+  assert.strictEqual(memento.get('gannet.recent').sean.length, 50, 'keeps 50, so each owner has its own used repos');
   recent.forgetRepo('sean', 'x/14');
   assert.ok(!memento.get('gannet.recent').sean.includes('x/14'));
+}
+
+// 0.3.0: Recent per owner — the filter applies before the limit of 10
+{
+  const recent = createRecent(makeMemento());
+  const pushed = Array.from({ length: 12 }, (_, i) => repo((i % 2 ? 'b' : 'a') + '/r' + i));
+  assert.strictEqual(recent.merge('l', pushed, new Map(), (r) => r.owner === 'a').length, 6);
+  recent.touch('l', 'c/first');
+  for (let i = 0; i < 11; i++) recent.touch('l', 'd/' + i);
+  const known = new Map([['c/first', repo('c/first')]]);
+  assert.deepStrictEqual(recent.merge('l', [], known, (r) => r.owner === 'c').map((r) => r.fullName), ['c/first'], 'an owner\'s used repo survives 11 others');
+}
+
+// the repo list cache: one file per account in Gannet's storage folder
+{
+  const { createRepoCache } = require('../src/repoCache.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gannet-cache-'));
+  try {
+    createRepoCache(dir).set('seanahn', [repo('seanahn/perch')]);
+    const got = createRepoCache(dir).get('seanahn');
+    assert.deepStrictEqual(got.repos, [repo('seanahn/perch')]);
+    assert.ok(!Number.isNaN(Date.parse(got.fetchedAt)), got.fetchedAt);
+    assert.ok(fs.existsSync(path.join(dir, 'repos-seanahn.json')));
+    assert.ok(!fs.readdirSync(dir).some((f) => f.endsWith('.tmp')), 'no temp file left');
+    assert.strictEqual(createRepoCache(dir).get('nobody'), undefined);
+    // Review Focus 3: a half-written file reads as absent
+    fs.writeFileSync(path.join(dir, 'repos-half.json'), '{"repos": [');
+    assert.strictEqual(createRepoCache(dir).get('half'), undefined);
+    fs.writeFileSync(path.join(dir, 'repos-odd.json'), '{"repos": 5}');
+    assert.strictEqual(createRepoCache(dir).get('odd'), undefined);
+    createRepoCache(dir).forget('seanahn');
+    assert.ok(!fs.existsSync(path.join(dir, 'repos-seanahn.json')));
+    createRepoCache(dir).forget('seanahn');   // twice is fine
+    createRepoCache(path.join(dir, 'new', 'deep')).set('x', []);   // the folder is made
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
 // origin URLs

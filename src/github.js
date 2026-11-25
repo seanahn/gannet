@@ -81,6 +81,17 @@ function createClient({ fetch, token }) {
       }
       return out.slice(0, max);
     },
+    /** The logins of the organizations the account belongs to, every page. */
+    async listOrgs() {
+      const out = [];
+      let url = `${API}/user/orgs?per_page=100`;
+      while (url) {
+        const res = await get(url);
+        for (const o of await res.json()) if (o && o.login) out.push(o.login);
+        url = nextLink(res);
+      }
+      return out;
+    },
     async listDir(owner, repo, path) {
       let res;
       try {

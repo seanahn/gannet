@@ -112,5 +112,16 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
     const { entries } = await sub.listDir('o', 'r', 'third_party');
     assert.deepStrictEqual(entries.map((e) => [e.name, e.type]), [['a.c', 'file'], ['abseil-cpp', 'submodule']]);
   }
+  // 0.3.0: the account's organizations, every page
+  {
+    const fetch = fakeFetch((url) => url.includes('page=2')
+      ? response(200, [{ login: 'other' }])
+      : response(200, [{ login: 'c3-e' }], { Link: '<https://api.github.com/user/orgs?per_page=100&page=2>; rel="next"' }));
+    const orgs = await createClient({ fetch, token: async () => TOKEN }).listOrgs();
+    assert.deepStrictEqual(orgs, ['c3-e', 'other']);
+    assert.ok(fetch.calls[0].url.startsWith('https://api.github.com/user/orgs?per_page=100'), fetch.calls[0].url);
+    const e = await rejects(createClient({ fetch: fakeFetch(() => response(401, { message: 'Bad credentials' })), token: async () => TOKEN }).listOrgs());
+    assert.strictEqual(e.kind, 'auth');
+  }
   console.log('GITHUB OK');
 })().catch((e) => { console.error(e); process.exit(1); });
