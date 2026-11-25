@@ -1,6 +1,7 @@
 'use strict';
 // Gannet: the GitHub repos your accounts can reach, as a tree. Wires the parts together and owns the commands.
 const vscode = require('vscode');
+const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { createClient } = require('./github.js');
@@ -15,11 +16,11 @@ const W = require('./workspaces.js');
 const { createMachineState } = require('./machineState.js');
 const { alive } = require('./localRepos.js');
 const { WorkspaceTree } = require('./workspaceTree.js');
+const { createRepoCache } = require('./repoCache.js');
 
 let state = null;
 
 const settings = () => vscode.workspace.getConfiguration('gannet');
-const checkoutFolder = () => settings().get('checkoutFolder', '~/github') || '~/github';
 
 const PENDING = 'gannet.pending';
 
@@ -37,19 +38,16 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     const old = context.globalState.get('gannet.local');
     if (old) await machine.update('gannet.local', old);
   }
+  // 0.2.0's workspaces, and the checkout folder setting 0.3.0 retires, become the list of directories, once
+  await W.migrate({ memento: machine, home, checkoutFolder: settings().get('checkoutFolder') });
   const local = createLocalRepos({ memento: machine, home });
   const workspaces = W.createWorkspaces({ memento: machine, home });
-  // this window's workspace (a saved workspace file, or one folder that is not a repo), as stored with its settings
-  const thisWs = () => { const c = W.currentWorkspace(vscode.workspace); return c && !c.untitled ? (workspaces.get(c.path) || c) : null; };
-  const here = thisWs();
-  if (here) await workspaces.add(here);
   const listed = () => workspaces.list().filter(W.exists);
-  const repoFolders = () => [checkoutFolder(), ...listed().map(W.repoFolderOf)];
 
   // after a restart (adding a workspace folder can cause one): drop half clones, forget deleted ones, find clones
-  for (const f of repoFolders()) local.cleanPartials(f);
+  for (const f of listed()) local.cleanPartials(f);
   await local.forgetMissing();
-  for (const f of repoFolders()) await local.scan(f);
+  for (const f of listed()) await local.scan(f);
 
   // Pushing as a VS Code account needs this window to serve tokens, and a shim git can run. Without them (or on
   // Windows, where the helper cannot find the named pipe) such repos are checked out without a push account.
@@ -71,9 +69,9 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   };
   const checkout = createCheckout({ run, local, accounts, helperCommand, home });
 
-  const tree = new GannetTree({ vscode, accounts, clientFor, recent, local });
+  const tree = new GannetTree({ vscode, accounts, clientFor, recent, local, cache: createRepoCache(store), workspaces, home });
   const gfs = new GannetFs({ vscode, clientFor, accounts });
-  const wsTree = new WorkspaceTree({ vscode, workspaces, local, current: () => W.currentWorkspace(vscode.workspace), home });
+  const wsTree = new WorkspaceTree({ vscode, workspaces, home });
   const refreshAll = () => { tree.refresh(); wsTree.refresh(); };
   state = { accounts, recent, local, tree, server, checkout, workspaces, wsTree };
 
@@ -93,81 +91,85 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     return r && r[0] ? r[0].fsPath : undefined;
   };
   const reveal = async (p) => vscode.commands.executeCommand(inWorkspace(p) ? 'revealInExplorer' : 'revealFileInOS', vscode.Uri.file(p));
-  const inside = (p, dir) => { const r = path.relative(dir, p); return !!r && !r.startsWith('..') && !path.isAbsolute(r); };
+  const within = (p, dir) => { const r = path.relative(dir, p); return !r.startsWith('..') && !path.isAbsolute(r); };   // or equal
+  const windowFolders = () => (vscode.workspace.workspaceFolders || []).filter((f) => f.uri.scheme === 'file').map((f) => f.uri.fsPath);
 
-  // a finished checkout goes into its workspace: none means this window, as before workspaces
-  async function place(p, ws, repo) {
-    if (!ws) return addToWorkspace(p);
-    if (ws.kind === 'folder') {
-      if (inside(p, ws.path)) return true;   // already shows as one of the folder's subfolders
-      const pick = await vscode.window.showInformationMessage(`${repo.fullName} is already checked out at ${p}.`, 'Reveal in Explorer');
-      if (pick === 'Reveal in Explorer') await reveal(p);
-      return false;
+  // a finished checkout goes into this window, unless it already shows inside one of its folders (seclab's ~/)
+  const place = (p) => (windowFolders().some((d) => within(p, d)) ? true : addToWorkspace(p));
+
+  /** Where Check out puts a repo: asked when there is no workspace, several, or a copy already. */
+  async function whereTo(repo) {
+    const live = listed();
+    const copies = local.checkoutsOf(repo.fullName);
+    if (!live.length) {
+      const gh = path.join(home, 'github');
+      const pick = await vscode.window.showQuickPick([
+        { label: '~/github', description: W.exists(gh) ? undefined : 'will be created', dir: gh },
+        { label: 'Choose a folder…', choose: true },
+      ], { title: 'Where should Gannet check out repos?' });
+      if (!pick) return undefined;
+      const dir = pick.choose ? await pickFolder('Where Gannet checks out repos', 'Use this folder') : pick.dir;
+      if (!dir) return undefined;
+      fs.mkdirSync(dir, { recursive: true });
+      await workspaces.add(dir);
+      wsTree.refresh();
+      return dir;
     }
-    const cur = thisWs();
-    if (cur && cur.path === ws.path) return addToWorkspace(p);
-    try {
-      await W.addFolderToFile(ws.path, p);
-      return true;
-    } catch (e) {
-      vscode.window.showWarningMessage(`Checked out to ${p}, but could not update ${ws.path}: ${e && e.message ? e.message : e}`);
-      return false;
-    }
+    if (live.length === 1 && !copies.length) return live[0];
+    const wf = windowFolders();
+    const items = live.map((w, i) => ({ w, i, n: wf.filter((d) => within(d, w)).length }))
+      .sort((a, b) => (b.n - a.n) || (a.i - b.i))
+      .map(({ w }) => {
+        const here = copies.filter((c) => W.workspaceOf(c.path, live) === w).map((c) => path.basename(c.path));
+        return { label: W.tilde(w, home), description: here.length ? `has ${here.join(', ')}` : undefined, dir: w };
+      });
+    if (copies.length) items.push({ label: 'Other folder…', other: true });
+    const pick = await vscode.window.showQuickPick(items, { title: `Check out ${repo.fullName} to…` });
+    if (!pick) return undefined;
+    return pick.other ? pickFolder(`Check out ${repo.fullName} to…`) : pick.dir;
   }
 
-  // checkouts not yet in the workspace, kept so one cut off by an extension restart is resumed on the next start
+  // checkouts not yet in the window, kept so one cut off by an extension restart is resumed on the next start
   const pending = () => machine.get(PENDING, []) || [];
   const setPending = (list) => machine.update(PENDING, list);
-  const samePending = (a, b) => a.repo.fullName === b.repo.fullName && a.folder === b.folder;
+  let seq = 0;
+  const newId = () => `${process.pid}-${Date.now()}-${++seq}`;
 
-  async function doCheckout(node, folder, workspace = null) {
+  async function doCheckout(node, folder, { target = null, id = null } = {}) {
     if (!node || !node.repo) return;
     const { repo, account } = node;
-    const job = { repo, account, folder, workspace, pid: process.pid };   // the window doing it
-    await setPending([...pending().filter((j) => !samePending(j, job)), job]);
+    const job = { id: id || newId(), repo, account, folder, target, pid: process.pid };   // the window doing it
+    await setPending([...pending().filter((j) => j.id !== job.id), job]);
     try {
+      const onTarget = (t) => setPending(pending().map((j) => (j.id === job.id ? { ...j, target: t } : j)));
       const res = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Checking out ${repo.fullName}`, cancellable: true },
-        (progress, token) => checkout.checkout({ repo, account, folder, token, onProgress: (line) => progress.report({ message: line }), ask: () => pickFolder(`${repo.name} is taken in ${folder} — pick another folder`) }));
+        (progress, token) => checkout.checkout({ repo, account, folder, target, onTarget, token, onProgress: (line) => progress.report({ message: line }) }));
       await recent.touch(account.login, repo.fullName);
-      await place(res.path, workspace, repo);
+      await place(res.path);
       refreshAll();
     } catch (e) {
       if (e && e.message === 'cancelled') return;
       if (e && e.kind === 'auth') accounts.forget(account.login);
       vscode.window.showErrorMessage(`Gannet: could not check out ${repo.fullName}: ${e && e.message ? e.message : e}`);
     } finally {
-      await setPending(pending().filter((j) => !samePending(j, job)));
+      await setPending(pending().filter((j) => j.id !== job.id));
     }
   }
 
-  const localPath = (node) => {
-    if (node && node.kind === 'wsrepo') return node.path;
-    const l = node && node.repo && local.get(node.repo.fullName);
-    return l && l.path;
+  /** The one checkout a command acts on: a checkout node's, or a repo's only one. */
+  const oneCheckout = (node) => {
+    if (!node) return null;
+    if (node.kind === 'checkout') return node.checkout;
+    const copies = node.repo ? local.checkoutsOf(node.repo.fullName) : [];
+    return copies.length === 1 ? copies[0] : null;
   };
-  const wsOf = (node) => node && node.ws;
   async function addWorkspace() {
-    const pick = await vscode.window.showQuickPick([{ label: 'Add workspace file…' }, { label: 'Add folder…' }, { label: 'New workspace…' }], { title: 'Add a workspace' });
-    if (!pick) return;
-    try {
-      if (pick.label === 'Add workspace file…') {
-        const r = await vscode.window.showOpenDialog({ canSelectFiles: true, canSelectFolders: false, canSelectMany: false, filters: { Workspace: ['code-workspace'] }, openLabel: 'Add', title: 'Add a workspace file' });
-        if (!r || !r[0]) return;
-        await workspaces.add({ kind: 'file', path: r[0].fsPath });
-      } else if (pick.label === 'Add folder…') {
-        const f = await pickFolder('Add a folder whose subfolders are repos', 'Add');
-        if (!f) return;
-        if (W.isGitRepo(f)) { vscode.window.showErrorMessage(`Gannet: ${f} is a git repo; add the folder that holds your repos.`); return; }
-        await workspaces.add({ kind: 'folder', path: f });
-      } else {
-        const name = await vscode.window.showInputBox({ prompt: 'Name of the new workspace', validateInput: (v) => (/^[^/\\:*?"<>|]+$/.test(v || '') ? undefined : 'A file name, without / or \\') });
-        if (!name) return;
-        const dir = await pickFolder(`Where ${name}'s repos go (the workspace file is kept there too)`, 'Create here');
-        if (!dir) return;
-        await workspaces.add({ kind: 'file', path: W.createWorkspaceFile(dir, name), repoFolder: dir });
-      }
-    } catch (e) { vscode.window.showErrorMessage(`Gannet: ${e && e.message ? e.message : e}`); return; }
-    for (const f of repoFolders()) await local.scan(f);
+    const f = await pickFolder('Add a folder Gannet checks repos out into', 'Add');
+    if (!f) return;
+    if (W.isGitRepo(f)) { vscode.window.showErrorMessage(`Gannet: ${f} is a git repo; add the folder that holds your repos.`); return; }
+    await workspaces.add(f);
+    local.cleanPartials(f);
+    await local.scan(f);
     refreshAll();
   }
 
@@ -180,52 +182,34 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
       const hidden = settings().get('hiddenAccounts', []) || [];
       if (!hidden.includes(node.account.login)) await settings().update('hiddenAccounts', [...hidden, node.account.login], vscode.ConfigurationTarget.Global);
     },
-    'gannet.checkout': (node) => { const ws = thisWs(); return doCheckout(node, ws ? W.repoFolderOf(ws) : checkoutFolder(), ws); },
+    'gannet.checkout': async (node) => {
+      if (!node || !node.repo) return;
+      const dir = await whereTo(node.repo);
+      if (dir) await doCheckout(node, dir);
+    },
     'gannet.checkoutTo': async (node) => {
       if (!node || !node.repo) return;
-      const cur = thisWs();
-      const isCur = (ws) => !!(cur && cur.path === ws.path);
-      const items = listed().sort((a, b) => Number(isCur(b)) - Number(isCur(a)))
-        .map((ws) => ({ label: ws.name, description: isCur(ws) ? 'this window' : ws.path, ws }));
-      items.push({ label: 'Other folder…', other: true });
-      const pick = await vscode.window.showQuickPick(items, { title: `Check out ${node.repo.fullName} to…` });
-      if (!pick) return;
-      if (pick.other) { const f = await pickFolder(`Check out ${node.repo.fullName} to…`); if (f) await doCheckout(node, f, null); return; }
-      await doCheckout(node, W.repoFolderOf(pick.ws), pick.ws);
+      const f = await pickFolder(`Check out ${node.repo.fullName} to…`);
+      if (f) await doCheckout(node, f);
     },
     'gannet.openOnGitHub': (node) => {
       const url = node && (node.repo ? node.repo.htmlUrl : node.fullName && `https://github.com/${node.fullName}`);
       return url && vscode.env.openExternal(vscode.Uri.parse(url));
     },
-    'gannet.revealLocal': async (node) => { const p = localPath(node); if (p) await reveal(p); },
+    'gannet.revealLocal': async (node) => { const c = oneCheckout(node); if (c) await reveal(c.path); },
     'gannet.addWorkspace': addWorkspace,
-    'gannet.openWorkspace': (node) => wsOf(node) && vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(node.ws.path), { forceNewWindow: true }),
-    'gannet.openWorkspaceHere': (node) => wsOf(node) && vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(node.ws.path), { forceNewWindow: false }),
-    'gannet.removeWorkspace': async (node) => { if (wsOf(node)) { await workspaces.remove(node.ws.path); wsTree.refresh(); } },
-    'gannet.setRepoFolder': async (node) => {
-      if (!wsOf(node)) return;
-      const f = await pickFolder(`Where new repos for ${node.ws.name} go`, 'Use this folder');
-      if (!f) return;
-      await workspaces.setRepoFolder(node.ws.path, f);
-      await local.scan(f);
-      refreshAll();
-    },
-    'gannet.addToWorkspace': async (node) => { const p = localPath(node); if (p) await addToWorkspace(p); },
+    'gannet.removeWorkspace': async (node) => { if (node && node.path) { await workspaces.remove(node.path); refreshAll(); } },
+    'gannet.revealWorkspace': (node) => node && node.path && vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(node.path)),
+    'gannet.addToWorkspace': async (node) => { const c = oneCheckout(node); if (c) await addToWorkspace(c.path); },
     'gannet.pushAs': async (node) => {
-      const p = localPath(node);
-      if (!p) return;
-      let account = node.account;
-      const fullName = node.kind === 'wsrepo' ? node.fullName : node.repo.fullName;
-      if (!account) {   // a repo in the Workspaces view has no account: ask which
-        const pick = await vscode.window.showQuickPick((await accounts.list()).map((a) => ({ label: a.login, description: a.source === 'gh' ? 'gh' : 'VS Code', account: a })), { title: `Push ${fullName} as…` });
-        if (!pick) return;
-        account = pick.account;
-      }
+      const c = oneCheckout(node);
+      if (!c || !node.account || !node.repo) return;
+      const { account, repo } = node;
       try {
-        await checkout.configurePush(p, account.login, helperCommand(account));
-        await local.remember(fullName, { path: p, login: account.login, byGannet: false });
+        await checkout.configurePush(c.path, account.login, helperCommand(account));
+        await local.remember(repo.fullName, { path: c.path, login: account.login, byGannet: c.byGannet });
         refreshAll();
-        vscode.window.showInformationMessage(`${fullName} now pushes as ${account.login}.`);
+        vscode.window.showInformationMessage(`${repo.fullName} at ${c.path} now pushes as ${account.login}.`);
       } catch (e) { vscode.window.showErrorMessage(`Gannet: ${e.message}`); }
     },
     'gannet.openFile': async (node) => {
@@ -246,16 +230,17 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     vscode.workspace.registerFileSystemProvider('gannet', gfs, { isReadonly: true, isCaseSensitive: true }),
     ...Object.entries(commands).map(([id, fn]) => vscode.commands.registerCommand(id, fn)),
     accounts.onDidChange(() => tree.refresh()),
-    vscode.workspace.onDidChangeWorkspaceFolders(() => wsTree.refresh()),
-    vscode.workspace.onDidChangeConfiguration(async (e) => {
-      if (e.affectsConfiguration('gannet.checkoutFolder')) await local.scan(checkoutFolder());
-      if (e.affectsConfiguration('gannet')) refreshAll();
-    }),
+    vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration('gannet')) refreshAll(); }),
     { dispose: () => { if (server) server.close(); } },
   );
 
   // resume checkouts an extension restart cut off, one after another, without holding up activation
-  state.resumed = (async () => { for (const job of pending().filter((j) => !(j.pid && alive(j.pid)))) await doCheckout({ kind: 'repo', repo: job.repo, account: job.account }, job.folder, job.workspace || null); })();
+  state.resumed = (async () => {
+    await setPending(pending().map((j) => (j.id ? j : { ...j, id: newId() })));   // 0.2.0's jobs had no id
+    for (const job of pending().filter((j) => !(j.pid && alive(j.pid)))) {
+      await doCheckout({ kind: 'repo', repo: job.repo, account: job.account }, job.folder, { target: job.target || null, id: job.id });
+    }
+  })();
 }
 
 function activate(context) { return activateWith(context); }

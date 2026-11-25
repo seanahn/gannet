@@ -2,7 +2,7 @@
   "name": "gannet",
   "displayName": "Gannet",
   "description": "Your GitHub repos as a tree: browse files without cloning, check out into your workspace, push as the right account.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "seanahn",
   "license": "MIT",
   "repository": {
@@ -48,7 +48,7 @@
         },
         {
           "id": "gannet.repos",
-          "name": "Repos"
+          "name": ""
         }
       ]
     },
@@ -124,24 +124,13 @@
         "icon": "$(add)"
       },
       {
-        "command": "gannet.openWorkspace",
-        "title": "Open Workspace in New Window",
-        "category": "Gannet",
-        "icon": "$(empty-window)"
-      },
-      {
-        "command": "gannet.openWorkspaceHere",
-        "title": "Open Workspace Here",
+        "command": "gannet.revealWorkspace",
+        "title": "Reveal in File Manager",
         "category": "Gannet"
       },
       {
         "command": "gannet.removeWorkspace",
         "title": "Remove from List",
-        "category": "Gannet"
-      },
-      {
-        "command": "gannet.setRepoFolder",
-        "title": "Set Repo Folder…",
         "category": "Gannet"
       }
     ],
@@ -188,19 +177,11 @@
           "when": "false"
         },
         {
-          "command": "gannet.openWorkspace",
-          "when": "false"
-        },
-        {
-          "command": "gannet.openWorkspaceHere",
-          "when": "false"
-        },
-        {
           "command": "gannet.removeWorkspace",
           "when": "false"
         },
         {
-          "command": "gannet.setRepoFolder",
+          "command": "gannet.revealWorkspace",
           "when": "false"
         }
       ],
@@ -229,32 +210,32 @@
         },
         {
           "command": "gannet.checkout",
-          "when": "view == gannet.repos && viewItem == repo-remote",
+          "when": "view == gannet.repos && viewItem =~ /^repo-/",
           "group": "1_checkout@1"
         },
         {
           "command": "gannet.checkoutTo",
-          "when": "view == gannet.repos && viewItem == repo-remote",
+          "when": "view == gannet.repos && viewItem =~ /^repo-/",
           "group": "1_checkout@2"
         },
         {
           "command": "gannet.revealLocal",
-          "when": "(view == gannet.repos || view == gannet.workspaces) && viewItem =~ /^repo-local/",
-          "group": "1_checkout@1"
-        },
-        {
-          "command": "gannet.addToWorkspace",
-          "when": "view == gannet.repos && viewItem =~ /^repo-local/",
-          "group": "1_checkout@2"
-        },
-        {
-          "command": "gannet.pushAs",
-          "when": "(view == gannet.repos || view == gannet.workspaces) && viewItem == repo-local-foreign",
+          "when": "view == gannet.repos && viewItem =~ /^(repo|checkout)-local/",
           "group": "1_checkout@3"
         },
         {
+          "command": "gannet.addToWorkspace",
+          "when": "view == gannet.repos && viewItem =~ /^(repo|checkout)-local/",
+          "group": "1_checkout@4"
+        },
+        {
+          "command": "gannet.pushAs",
+          "when": "view == gannet.repos && viewItem =~ /-local-foreign$/",
+          "group": "1_checkout@5"
+        },
+        {
           "command": "gannet.openOnGitHub",
-          "when": "(view == gannet.repos || view == gannet.workspaces) && viewItem =~ /^repo-/",
+          "when": "view == gannet.repos && viewItem =~ /^repo-/",
           "group": "2_github@1"
         },
         {
@@ -263,40 +244,20 @@
           "group": "1_account@1"
         },
         {
-          "command": "gannet.openWorkspace",
-          "when": "view == gannet.workspaces && viewItem =~ /^workspace-(file|folder)/",
-          "group": "inline"
-        },
-        {
-          "command": "gannet.openWorkspace",
-          "when": "view == gannet.workspaces && viewItem =~ /^workspace-(file|folder)/",
+          "command": "gannet.revealWorkspace",
+          "when": "view == gannet.workspaces && viewItem =~ /^workspace/",
           "group": "1_open@1"
         },
         {
-          "command": "gannet.openWorkspaceHere",
-          "when": "view == gannet.workspaces && viewItem =~ /^workspace-(file|folder)$/",
-          "group": "1_open@2"
-        },
-        {
-          "command": "gannet.setRepoFolder",
-          "when": "view == gannet.workspaces && viewItem =~ /^workspace-file/",
-          "group": "2_edit@1"
-        },
-        {
           "command": "gannet.removeWorkspace",
-          "when": "view == gannet.workspaces && viewItem =~ /^workspace-/",
-          "group": "2_edit@2"
+          "when": "view == gannet.workspaces && viewItem =~ /^workspace/",
+          "group": "2_edit@1"
         }
       ]
     },
     "configuration": {
       "title": "Gannet",
       "properties": {
-        "gannet.checkoutFolder": {
-          "type": "string",
-          "default": "~/github",
-          "description": "The folder repos are checked out into. Check Out to… picks another place for one repo."
-        },
         "gannet.hiddenAccounts": {
           "type": "array",
           "items": {
@@ -307,8 +268,5 @@
         }
       }
     }
-  },
-  "dependencies": {
-    "jsonc-parser": "^3.3.1"
   }
 }
