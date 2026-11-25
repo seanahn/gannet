@@ -44,6 +44,7 @@ class Uri {
     return new Uri(m[1], dec(m[2]), dec(m[3]), dec(m[4]), dec(m[5]));
   }
   static from({ scheme, authority = '', path = '', query = '', fragment = '' }) { return new Uri(scheme, authority, path, query, fragment); }
+  static joinPath(u, ...parts) { return new Uri(u.scheme, u.authority, require('path').posix.join(u.path, ...parts)); }
   get fsPath() { return this.path; }
   with(change) { return new Uri(change.scheme ?? this.scheme, change.authority ?? this.authority, change.path ?? this.path, change.query ?? this.query, change.fragment ?? this.fragment); }
   toString() {
@@ -76,7 +77,7 @@ function fakeVscode(opts = {}) {
   const configChanged = new EventEmitter();
   const foldersChanged = new EventEmitter();
   const config = Object.assign({ 'gannet.checkoutFolder': '~/github', 'gannet.hiddenAccounts': [] }, opts.config || {});
-  const rec = { quickPicks: [], inputBoxes: [], messages: [], opened: [], commands: new Map(), executed: [], providers: [], trees: [], folderUpdates: [], sessionCalls: [], configWrites: [], progress: [] };
+  const rec = { quickPicks: [], inputBoxes: [], messages: [], opened: [], commands: new Map(), executed: [], providers: [], trees: [], webviews: [], folderUpdates: [], sessionCalls: [], configWrites: [], progress: [] };
   const vs = {
     _rec: rec, _config: config, _sessionsChanged: sessionsChanged,
     accounts: opts.accounts || [], tokens: opts.tokens || {},
@@ -130,12 +131,33 @@ function fakeVscode(opts = {}) {
       withProgress: async (o, task) => { rec.progress.push(o); const cancel = new EventEmitter(); const token = { isCancellationRequested: false, onCancellationRequested: cancel.event }; vs._cancel = () => { token.isCancellationRequested = true; cancel.fire(); }; return task({ report: () => {} }, token); },
       registerTreeDataProvider: (id, provider) => { rec.trees.push({ id, provider }); return { dispose() {} }; },
       createTreeView: (id, o) => { rec.trees.push({ id, provider: o.treeDataProvider }); return { dispose() {} }; },
+      registerWebviewViewProvider: (id, provider) => { rec.webviews.push({ id, provider }); return { dispose() {} }; },
     },
     commands: {
       registerCommand: (id, fn) => { rec.commands.set(id, fn); return { dispose() {} }; },
       executeCommand: async (id, ...args) => { rec.executed.push({ id, args }); if (rec.commands.has(id)) return rec.commands.get(id)(...args); return undefined; },
     },
     env: { openExternal: async (uri) => { rec.opened.push(String(uri)); return true; } },
+  };
+  /** Shows a registered webview view: the provider resolves a fake view; _send hands it a message and waits. */
+  vs._resolveView = (id) => {
+    const entry = rec.webviews.filter((w) => w.id === id).at(-1);
+    if (!entry) throw new Error('no webview view ' + id);
+    const received = new EventEmitter(), disposed = new EventEmitter();
+    const posted = [];
+    const view = {
+      webview: {
+        options: {}, html: '', cspSource: 'vscode-res:',
+        asWebviewUri: (u) => u,
+        postMessage: (m) => { posted.push(m); return Promise.resolve(true); },
+        onDidReceiveMessage: received.event,
+      },
+      onDidDispose: disposed.event, visible: true, _posted: posted,
+      _send: (m) => entry.provider._handle(m),
+      _dispose: () => disposed.fire(),
+    };
+    entry.provider.resolveWebviewView(view);
+    return view;
   };
   return vs;
 }
