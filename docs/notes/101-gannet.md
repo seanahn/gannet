@@ -183,6 +183,14 @@ GANNET
     they cannot be fetched.
   *(builder's call)*
 
+- ⟳ marks every account's list stale: the next time All repos is opened it is fetched again and the file
+  replaced; until then the owners still come from the old file. *(builder's call)*
+- Recent keeps up to 50 used repos per account, so each owner still has its own used repos to show; each owner
+  shows at most 10. *(builder's call)*
+- Organizations show an organization icon, users a person icon. *(builder's call)*
+- The repo view has no title, so no "Repos" heading shows above the owners. *(Sean: "we don't need 'repos' root
+  node")*
+
 ### Checked-out repos
 
 - A repo checked out anywhere on this machine has a **green Octocat** (`github-alt` coloured `charts.green`),
@@ -212,7 +220,8 @@ GANNET
 - `.code-workspace` files are no longer workspaces, and Gannet no longer edits them. That drops the `jsonc-parser`
   dependency. *(builder's reading of "managing workspace directories", stated to Sean and not corrected)*
 - Nothing is added to the list automatically, except once, on upgrading: 0.2.0's list carries over (its folders
-  as they are, each workspace file replaced by its repo folder), and so does the `gannet.checkoutFolder` folder
+  as they are, each workspace file replaced by its repo folder: the one set for it, else the folder most of its
+  repos share, else the file's own folder), and so does the `gannet.checkoutFolder` folder
   (`~/github` by default) if it exists, so earlier users keep checking out there without being asked. The setting
   is then retired. *(builder's call)*
 - A checkout belongs to the deepest listed workspace that contains it (with `~/` and `~/github` both listed,
@@ -225,7 +234,8 @@ GANNET
 
 - **Check out** *(Sean)*:
   - **No workspace yet:** it asks for a directory, suggesting `~/github`, and saves it as a workspace. *(builder's
-    guess, not corrected)*
+    guess, not corrected)* The question is a quick pick, "Where should Gannet check out repos?", with `~/github`
+    (created if absent) and **Choose a folder…**, so no path is typed. *(builder's call)*
   - **One workspace:** the repo goes there, with no question.
   - **Several:** a quick pick of the workspaces chooses where; the first entry is the workspace that holds the
     most folders of this window. *(builder's call on the order)*
