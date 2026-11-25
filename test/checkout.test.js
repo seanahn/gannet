@@ -29,17 +29,16 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
     sh(`git clone -q --bare "${src}" "${bare}"`, tmp);
     const repo = { fullName: 'seanahn/perch', owner: 'seanahn', name: 'perch', cloneUrl: bare, defaultBranch: 'main' };
 
-    // where it goes
+    // where it goes: the first free of <repo>, <owner>-<repo>, <repo>-2, <repo>-3…; a folder is never reused
     {
       const folder = path.join(tmp, 'choose');
+      assert.strictEqual(chooseTarget(path.join(tmp, 'empty'), repo, { isDir }), path.join(tmp, 'empty', 'perch'));
       fs.mkdirSync(path.join(folder, 'perch'), { recursive: true });
-      const origin = (map) => (p) => map[p] || '';
-      assert.deepStrictEqual(chooseTarget(path.join(tmp, 'empty'), repo, { isDir, originOf: origin({}) }), { path: path.join(tmp, 'empty', 'perch'), existing: false });
-      assert.deepStrictEqual(chooseTarget(folder, repo, { isDir, originOf: origin({ [path.join(folder, 'perch')]: 'git@github.com:seanahn/perch.git' }) }), { path: path.join(folder, 'perch'), existing: true });
-      assert.deepStrictEqual(chooseTarget(folder, repo, { isDir, originOf: origin({ [path.join(folder, 'perch')]: 'git@github.com:SeanAhn/Perch.git' }) }), { path: path.join(folder, 'perch'), existing: true }, 'GitHub names ignore case');
-      assert.deepStrictEqual(chooseTarget(folder, repo, { isDir, originOf: origin({ [path.join(folder, 'perch')]: 'git@github.com:other/perch.git' }) }), { path: path.join(folder, 'seanahn-perch'), existing: false });
+      assert.strictEqual(chooseTarget(folder, repo, { isDir }), path.join(folder, 'seanahn-perch'), 'even when perch holds this repo');
       fs.mkdirSync(path.join(folder, 'seanahn-perch'));
-      assert.deepStrictEqual(chooseTarget(folder, repo, { isDir, originOf: origin({}) }), { ask: true });
+      assert.strictEqual(chooseTarget(folder, repo, { isDir }), path.join(folder, 'perch-2'));
+      fs.mkdirSync(path.join(folder, 'perch-2'));
+      assert.strictEqual(chooseTarget(folder, repo, { isDir }), path.join(folder, 'perch-3'));
     }
 
     // the push settings
@@ -63,9 +62,11 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
     {
       const spawn = recordSpawn();
       const { co, local } = make(spawn);
-      const res = await co.checkout({ repo, account: { login: 'seanahn', source: 'gh' }, folder: '~/github' });
+      const targets = [];
+      const res = await co.checkout({ repo, account: { login: 'seanahn', source: 'gh' }, folder: '~/github', onTarget: async (t) => { targets.push([t, spawn.calls.length]); } });
       const target = path.join(home, 'github', 'perch');
-      assert.deepStrictEqual(res, { path: target, existing: false });
+      assert.deepStrictEqual(res, { path: target, cloned: true });
+      assert.deepStrictEqual(targets, [[target, 0]], 'the target is told before git runs');
       assert.ok(fs.existsSync(path.join(target, 'a.txt')));
       assert.ok(!fs.readdirSync(path.dirname(target)).some((n) => n.includes('gannet-partial')));
       const config = fs.readFileSync(path.join(target, '.git', 'config'), 'utf8');
@@ -74,7 +75,7 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
       const helpers = sh('git config --local --get-all credential.https://github.com.helper', target).split('\n');
       assert.deepStrictEqual(helpers.slice(0, 2), ['', 'HELPER-seanahn']);
       assert.strictEqual(sh('git config --local credential.https://github.com.username', target).trim(), 'seanahn');
-      assert.deepStrictEqual(local.get('seanahn/perch'), { path: target, login: 'seanahn', byGannet: true });
+      assert.deepStrictEqual(local.checkoutsOf('seanahn/perch'), [{ path: target, login: 'seanahn', byGannet: true }]);
       // the sign-in travels in git's environment, scoped to github.com, never on the command line (review fix)
       const args = spawn.calls[0];
       assert.ok(!args.join(' ').includes(B64) && !args.join(' ').includes(TOKEN), args.join(' '));
@@ -92,22 +93,31 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
       assert.strictEqual(sh('git config --local credential.https://github.com.username', target).trim(), 'c3-sahn');
       await configurePush(runProcess, target, 'seanahn', 'HELPER-seanahn');
 
-      // the same repo from a second account: nothing cloned, its push account kept (Review Focus 5)
+      // the same repo again, from a second account: a second copy beside the first, pushing as that account
       const again = await co.checkout({ repo, account: { login: 'c3-sahn', source: 'gh' }, folder: '~/github' });
-      assert.deepStrictEqual(again, { path: target, existing: true });
-      assert.strictEqual(spawn.calls.length, 1);
-      assert.strictEqual(local.get('seanahn/perch').login, 'seanahn');
+      const second = path.join(home, 'github', 'seanahn-perch');
+      assert.deepStrictEqual(again, { path: second, cloned: true });
+      assert.strictEqual(spawn.calls.length, 2);
+      assert.deepStrictEqual(local.checkoutsOf('seanahn/perch').map((c) => [c.path, c.login]), [[target, 'seanahn'], [second, 'c3-sahn']]);
     }
 
-    // a repo already sitting in the folder, cloned by hand: remembered, not cloned, no account given to it
+    // resuming a checkout whose clone was already renamed into place: set up and remembered, never cloned again
     {
-      const folder = path.join(tmp, 'byhand');
-      sh(`git clone -q "${bare}" perch && git -C perch remote set-url origin https://github.com/seanahn/perch.git`, (fs.mkdirSync(folder), folder));
+      const folder = path.join(tmp, 'resume');
+      fs.mkdirSync(folder);
+      sh(`git clone -q "${bare}" perch && git -C perch remote set-url origin https://github.com/seanahn/perch.git`, folder);
+      const target = path.join(folder, 'perch');
       const spawn = recordSpawn();
       const { co, local } = make(spawn);
-      assert.deepStrictEqual(await co.checkout({ repo, account: { login: 'seanahn', source: 'gh' }, folder }), { path: path.join(folder, 'perch'), existing: true });
+      assert.deepStrictEqual(await co.checkout({ repo, account: { login: 'seanahn', source: 'gh' }, folder, target }), { path: target, cloned: false });
       assert.strictEqual(spawn.calls.length, 0);
-      assert.deepStrictEqual(local.get('seanahn/perch'), { path: path.join(folder, 'perch'), login: null, byGannet: false });
+      assert.strictEqual(sh('git config --local credential.https://github.com.username', target).trim(), 'seanahn');
+      assert.deepStrictEqual(local.checkoutsOf('seanahn/perch'), [{ path: target, login: 'seanahn', byGannet: true }]);
+      // a target not there yet is cloned into; one holding something else is passed over for a free name
+      const fresh = path.join(folder, 'later');
+      assert.deepStrictEqual(await co.checkout({ repo, account: { login: 'seanahn', source: 'gh' }, folder, target: fresh }), { path: fresh, cloned: true });
+      fs.mkdirSync(path.join(folder, 'junk'));
+      assert.deepStrictEqual(await co.checkout({ repo, account: { login: 'seanahn', source: 'gh' }, folder, target: path.join(folder, 'junk') }), { path: path.join(folder, 'seanahn-perch'), cloned: true });
     }
 
     // no token: stops before git runs
@@ -152,7 +162,7 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
       const cancel = new EventEmitter();
       const token = { isCancellationRequested: false, onCancellationRequested: (fn) => { cancel.on('c', fn); return { dispose() {} }; } };
       const first = co.checkout({ repo, account: { login: 'seanahn' }, folder, token });
-      const second = co.checkout({ repo: { ...repo, fullName: 'seanahn/roost', name: 'roost' }, account: { login: 'seanahn' }, folder });
+      const second = co.checkout({ repo, account: { login: 'seanahn' }, folder });   // the same repo, queued
       await new Promise((r) => setTimeout(r, 50));
       assert.strictEqual(children.length, 1, 'the second waits');
       token.isCancellationRequested = true; cancel.emit('c');
@@ -163,7 +173,15 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
       await new Promise((r) => setTimeout(r, 50));
       assert.strictEqual(children.length, 2, 'then the second starts');
       children[1].finish();
-      assert.deepStrictEqual(await second, { path: path.join(folder, 'roost'), existing: false });
+      assert.deepStrictEqual(await second, { path: path.join(folder, 'perch'), cloned: true }, 'named when its turn comes: perch is free again');
+      // two queued copies of one repo get two names
+      const third = co.checkout({ repo, account: { login: 'seanahn' }, folder });
+      const fourth = co.checkout({ repo, account: { login: 'seanahn' }, folder });
+      await new Promise((r) => setTimeout(r, 50));
+      children[2].finish();
+      await new Promise((r) => setTimeout(r, 50));
+      children[3].finish();
+      assert.deepStrictEqual([(await third).path, (await fourth).path], [path.join(folder, 'seanahn-perch'), path.join(folder, 'perch-2')]);
     }
     console.log('CHECKOUT OK');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }

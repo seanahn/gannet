@@ -1,5 +1,5 @@
 'use strict';
-// Checking a repo out: picking the folder, cloning one repo at a time into a partial folder that is renamed only
+// Checking a repo out: naming its folder (a repo may be checked out more than once), cloning one repo at a time into a partial folder that is renamed only
 // when git succeeds, and writing the repo's own credential settings so it pushes as the account it came from.
 const fs = require('fs');
 const path = require('path');
@@ -8,15 +8,16 @@ const { parseOrigin, originOf, expandHome, isDir, partialOf } = require('./local
 
 const KEY = 'credential.https://github.com';
 
-/** Where a repo goes in folder: <name>, else <owner>-<name>; a folder already holding this repo is reused. */
-function chooseTarget(folder, repo, { isDir: dirExists = isDir, originOf: origin = originOf } = {}) {
-  for (const name of [repo.name, `${repo.owner}-${repo.name}`]) {
-    const p = path.join(folder, name);
-    if (!dirExists(p)) return { path: p, existing: false };
-    if (String(parseOrigin(origin(p))).toLowerCase() === repo.fullName.toLowerCase()) return { path: p, existing: true };
+/** Where a repo goes in folder: the first free of <name>, <owner>-<name>, <name>-2, <name>-3, …; never a taken one. */
+function chooseTarget(folder, repo, { isDir: dirExists = isDir } = {}) {
+  const names = [repo.name, `${repo.owner}-${repo.name}`];
+  for (let i = 0; ; i++) {
+    const p = path.join(folder, i < names.length ? names[i] : `${repo.name}-${i}`);
+    if (!dirExists(p)) return p;
   }
-  return { ask: true };
 }
+
+const holds = (dir, repo) => isDir(dir) && String(parseOrigin(originOf(dir))).toLowerCase() === repo.fullName.toLowerCase();
 
 /** The `git config` argument lists that make a repo ask only Gannet's helper, as login, for github.com. */
 function pushConfigArgs(login, helper) {
@@ -77,38 +78,33 @@ function createCheckout({ run, spawn = childProcess.spawn, local, accounts, help
     });
   }
 
-  async function run1({ repo, account, folder, onProgress, token: cancel, ask }) {
-    const known = local.get(repo.fullName);
-    if (known && isDir(known.path)) return { path: known.path, existing: true };
+  async function setUp(target, repo, account) {
+    // no helper (VS Code accounts when this window cannot serve tokens): write nothing rather than a broken setting;
+    // the repo is remembered with no account, so the tree offers Push as later
+    const helper = helperCommand(account);
+    if (helper) await configurePush(run, target, account.login, helper);
+    await local.remember(repo.fullName, { path: target, login: helper ? account.login : null, byGannet: true });
+  }
+
+  async function run1({ repo, account, folder, target, onTarget, onProgress, token: cancel }) {
     const dir = expandHome(folder, home);
-    let target = chooseTarget(dir, repo);
-    if (target.ask) {
-      const picked = ask ? await ask() : undefined;
-      if (!picked) throw new Error('cancelled');
-      target = chooseTarget(picked, repo);
-      if (target.ask) throw new Error(`${path.join(picked, repo.name)} is already taken`);
-    }
-    if (target.existing) {
-      await local.remember(repo.fullName, { path: target.path, login: known ? known.login : null, byGannet: known ? known.byGannet : false });
-      return { path: target.path, existing: true };
-    }
+    // resuming: the clone may already be in place (the restart came after the rename); then only set it up
+    if (target && holds(target, repo)) { await setUp(target, repo, account); return { path: target, cloned: false }; }
+    if (!target || isDir(target)) target = chooseTarget(dir, repo);
     const token = await accounts.token(account.login);   // no usable token: stop before git runs
-    fs.mkdirSync(path.dirname(target.path), { recursive: true });
-    const partial = partialOf(target.path);
+    if (onTarget) await onTarget(target);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    const partial = partialOf(target);
     fs.rmSync(partial, { recursive: true, force: true });
     try {
       await clone(repo.cloneUrl, partial, token, cancel, onProgress);
-      fs.renameSync(partial, target.path);
+      fs.renameSync(partial, target);
     } catch (e) {
       fs.rmSync(partial, { recursive: true, force: true });
       throw e;
     }
-    // no helper (VS Code accounts when this window cannot serve tokens): write nothing rather than a broken setting;
-    // the repo is remembered with no account, so the tree offers Push as later
-    const helper = helperCommand(account);
-    if (helper) await configurePush(run, target.path, account.login, helper);
-    await local.remember(repo.fullName, { path: target.path, login: helper ? account.login : null, byGannet: true });
-    return { path: target.path, existing: false };
+    await setUp(target, repo, account);
+    return { path: target, cloned: true };
   }
 
   return {
