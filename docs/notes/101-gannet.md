@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25. How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) designed, not built. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -285,6 +285,104 @@ GANNET
   |                | [refused]  note with Add to workspace;  then clear pending                 |
   |                | [restart after the rename]  resume finds the clone at target: set up + add, no new clone |
   |<-- green Octocat, "~/ · /git" ---------|                    |                        |
+```
+
+## One sidebar, drawn as a webview (0.4.0)
+
+0.4.0 changes how Gannet is drawn, not what it does. 0.3.0's sidebar held two views, Workspaces and the repo tree,
+so VS Code drew a header row above each: the owners sat under a `∨` row even with the tree's title empty. *(Sean:
+"instead of all roots of the repos tree, no repos tree"; "the skills panel is done like that. some configuration
+panel on top, then, trees below", pointing at Perch's Sessions panel)* Where this section and the sections above
+disagree on how things look, this section wins; everything about what the tree holds, the checkout flow, caching
+and workspaces stays as 0.3.0 describes.
+
+```
+GANNET                               [+ account] [⟳]
+  /git                                  [📂] [✕]     (buttons show on hover)
+  ~/github                              [📂] [✕]
+  ~/old                     Missing           [✕]
+  + Add folder…
+ ───────────────────────────────────────────────
+ ▸ (org) bpmn2               via seanahn
+ ▾ (org) c3-e                via c3-sahn
+   ▸ Recent
+   ▾ All repos               312
+     ▸ (cat) c3nexus         private · ~
+         ...
+ ▾ (person) seanahn
+   ▾ Recent
+     ▾ (green cat) perch     /git · ~/github
+       ▾ /git/perch
+         ▸ src                                   (folders: arrow only)
+           (file) README.md                      (files: icon in the arrow's column)
+```
+
+### What it is
+
+- **One view, a webview,** like Perch's Sessions panel. With one view in the container, VS Code merges its
+  header into the **GANNET** title, so there is no header row; **+ account** and **⟳** sit in that title. *(Sean)*
+- **On top, the workspace directories** as a small configuration panel, not a tree: one row per directory (`~` for
+  home, full path as tooltip), with **Reveal** (in the system's file manager) and **✕ Remove from list** buttons
+  that show on hover, **Missing** on a directory that is gone (Reveal is not offered there), and an **Add folder…**
+  row at the end. A thin line separates it from the owners. *(Sean: "a little configuration panel on top")* The
+  rules are 0.3.0's: a git repo is refused, removing deletes nothing, the list is per machine. *(builder's calls on
+  the layout)*
+- **Below, the owners are the top-level rows,** with everything under them as 0.3.0's tree: Recent, All repos,
+  repos, checkouts, folders and files, the same labels, descriptions, tooltips and expanded-at-start rules. *(Sean)*
+- **Icons:**
+  - folders have none, only the expand arrow; *(Sean, as in 0.3.0)*
+  - every file has the same generic file icon, in the arrow's column, so files line up under the folders'
+    arrows. A webview cannot use the file icon theme, so there is no per-type icon. *(Sean chose a generic icon
+    over none)*
+  - owners: an organization or a person icon; repos: the Octocat, green when checked out; errors: a warning
+    icon. *(as 0.3.0)*
+  - icons are inline SVG in the page, like Perch's; no icon font or other dependency. *(builder's call)*
+- **Colours and fonts come from the VS Code theme** (sidebar background, list hover and selection, description
+  colour, `charts.green`), so it looks like a native tree in any theme. *(builder's call)*
+
+### How it behaves
+
+- **Expanding** a row asks the extension for its children only then, as the tree did, so a remote folder is fetched
+  when opened. Rows that start expanded (organizations, an own account without organizations) are fetched on
+  first draw. A row being fetched shows a small spinner. *(builder's call)*
+- **Expansion is remembered** per row, across hiding the sidebar and reloading the window. *(builder's call)*
+- **Clicking** a row does what clicking its tree item did: open a file, open on GitHub, sign in, and so on.
+  Clicking a row with children toggles it. *(builder's call)*
+- **The cloud button** (Check out) shows on hover on a repo not checked out, as the inline button did. *(as 0.3.0)*
+- **Right-click** shows VS Code's own context menu with the same entries, on the same kinds of row, as 0.3.0's
+  tree: Check out, Check out to…, Reveal, Add to window, Push as, Open on GitHub, Hide account. VS Code's default
+  Cut/Copy/Paste entries are left out. *(builder's call: native menus, so commands and their conditions are
+  unchanged)*
+- **Keyboard:** the list takes focus; Up/Down move, Right expands or goes to the first child, Left collapses or goes
+  to the parent, Enter or Space does what a click does. The context-menu key is not supported (a webview cannot
+  open VS Code's menu itself). *(builder's call)*
+- **Refreshing** (⟳, a checkout, a workspace or account change) redraws from the top and keeps what was expanded;
+  only ⟳ reads repo lists from GitHub again. *(as 0.3.0)*
+- No search box, no drag and drop, no multi-select. *(non-goals: the tree had none)*
+
+### How it is made
+
+- The tree's model stays: the code that decides an owner's children, a repo's label, description, icon, tooltip,
+  click and context value is kept and tested as it is. The webview is only a new way to draw it: the extension
+  turns each node into a row (id, label, description, tooltip, icon, colour, has-children, expanded-at-start,
+  context value, click) and sends rows when the page asks for a row's children. *(builder's call: keeps 0.3.0's
+  tests and behaviour)*
+- Every row has a stable id, built from its parent's id and its own key, so expansion can be remembered and a
+  right-click can name the row it was on. *(builder's call)*
+- The Workspaces view and its tree code are removed; the panel is drawn from the same workspace list.
+
+```
+ Page (webview)             Extension                       GitHub / disk
+   |-- ready ----------------->|                                |
+   |<- workspaces + root rows -|-- owners (cache / API) ------->|
+   |-- expand(id) ------------>|-- children of node id ------->|
+   |<- rows(id) ---------------|                                |
+   |-- right-click on row -> VS Code menu -> command(nodeId) -->|
+   |                           |-- node lookup; checkout ------>|
+   |<- redraw -----------------|  (tree changed)                |
+   |-- expand(id) for each remembered expanded row ...          |
+   |-- expand(id) fails -------|                                |
+   |<- rows(id) = [error row] -|  (signed out, rate limit, 404: shown in place of the children, as 0.3.0) |
 ```
 
 ## Checkout
