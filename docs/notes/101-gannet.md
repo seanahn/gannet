@@ -114,6 +114,11 @@ GANNET                                   [+ account] [⟳]
 
 ### A file, before checkout
 
+- Files and folders, on GitHub or on disk, look as in VS Code's own explorer: the file icon theme's icons, so no
+  folder icons under Seti, and file icons lined up with the folders' expand arrows. *(Sean: "native vscode file
+  explorer does not show folder icons")* Every such item carries its resource (a `gannet:` URI before checkout)
+  and the File or Folder icon kind, which is what VS Code needs to do both.
+
 - Clicking opens it in an editor, read-only, through a `gannet:` file system provider
   (`gannet://<login>/<owner>/<repo>/<path>`) that fetches the file's raw content on read.
 - Binary files open the way VS Code opens any binary file. Files over 10 MB show a note instead and offer

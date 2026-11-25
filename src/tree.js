@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { MAX: RECENT_MAX } = require('./recent.js');
 const { isDir } = require('./localRepos.js');
+const { toUri } = require('./fsProvider.js');
 
 const LARGE = 10 * 1024 * 1024;
 const PUSHED_PAGE = 100;   // Recent's pool from GitHub: one page of the recently pushed repos
@@ -24,6 +25,7 @@ function diskChildren(dir) {
 function diskTreeItem(vs, node) {
   const it = new vs.TreeItem(path.basename(node.path), node.dir ? vs.TreeItemCollapsibleState.Collapsed : vs.TreeItemCollapsibleState.None);
   it.resourceUri = vs.Uri.file(node.path);
+  it.iconPath = node.dir ? vs.ThemeIcon.Folder : vs.ThemeIcon.File;   // see entryIcon
   it.contextValue = node.dir ? 'disk-dir' : 'disk-file';
   if (!node.dir) it.command = { command: 'vscode.open', title: 'Open', arguments: [it.resourceUri] };
   return it;
@@ -160,7 +162,10 @@ class GannetTree {
       case 'entry': {
         const e = node.entry;
         const it = new vs.TreeItem(e.name, e.type === 'dir' ? S.Collapsed : S.None);
-        if (e.type === 'dir') { it.contextValue = 'dir'; it.iconPath = vs.ThemeIcon.Folder || new vs.ThemeIcon('folder'); return it; }
+        // with a resource and the File/Folder kind, VS Code draws the file icon theme's icons as its explorer does:
+        // no folder icons under Seti, and file icons lined up with the folders' arrows
+        it.resourceUri = toUri(vs, node.account.login, node.repo.owner, node.repo.name, e.path);
+        if (e.type === 'dir') { it.contextValue = 'dir'; it.iconPath = vs.ThemeIcon.Folder; return it; }
         if (e.type === 'submodule') {
           it.contextValue = 'submodule'; it.description = 'submodule';
           it.command = { command: 'gannet.openUrl', title: 'Open on GitHub', arguments: [e.htmlUrl] };
@@ -170,7 +175,7 @@ class GannetTree {
         it.contextValue = e.size > LARGE ? 'file-large' : 'file';
         if (e.type === 'symlink') it.description = 'symlink';
         it.command = { command: 'gannet.openFile', title: 'Open', arguments: [node] };
-        it.iconPath = vs.ThemeIcon.File || new vs.ThemeIcon('file');
+        it.iconPath = vs.ThemeIcon.File;
         return it;
       }
       case 'disk': return diskTreeItem(vs, node);

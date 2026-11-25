@@ -62,6 +62,8 @@ class FileSystemError extends Error {
 
 class TreeItem { constructor(label, collapsibleState) { this.label = label; this.collapsibleState = collapsibleState; } }
 class ThemeIcon { constructor(id) { this.id = id; } }
+ThemeIcon.File = new ThemeIcon('file');
+ThemeIcon.Folder = new ThemeIcon('folder');
 
 /**
  * A fake vscode module. opts.accounts: VS Code GitHub accounts [{ id, label }]; opts.tokens: { label: token };

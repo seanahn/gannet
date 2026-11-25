@@ -80,6 +80,12 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gannet-tree-'));
     assert.strictEqual(item(libNode).command.command, 'gannet.openUrl');
     assert.strictEqual(item(linkNode).collapsibleState, vscode.TreeItemCollapsibleState.None);
     assert.strictEqual(item(linkNode).command.command, 'gannet.openFile', 'a symlink opens as a file');
+    // icons as VS Code's own explorer draws them: the file icon theme's, from the resource; folders take the
+    // theme's folder icon (none in Seti), and files the File kind, so VS Code lines them up with the folders' arrows
+    for (const n of [srcNode, aNode, linkNode]) assert.strictEqual(item(n).resourceUri.scheme, 'gannet', item(n).label);
+    assert.strictEqual(item(srcNode).resourceUri.path, '/seanahn/perch/src');
+    assert.strictEqual(item(srcNode).iconPath, vscode.ThemeIcon.Folder);
+    assert.strictEqual(item(aNode).iconPath, vscode.ThemeIcon.File);
     // a folder over GitHub's 1,000-entry limit ends with a way to see the rest (Review Focus 1)
     const inSrc = await tree.getChildren(srcNode);
     assert.deepStrictEqual(inSrc.map((n) => item(n).label), ['x.js', 'More files — open on GitHub']);
@@ -110,6 +116,8 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gannet-tree-'));
     assert.deepStrictEqual(onDisk.map((n) => item(n).label), ['docs', 'README.md']);
     assert.strictEqual(item(onDisk[1]).command.command, 'vscode.open');
     assert.strictEqual(item(onDisk[1]).resourceUri.fsPath, path.join(dir, 'README.md'));
+    assert.strictEqual(item(onDisk[0]).iconPath, vscode.ThemeIcon.Folder);
+    assert.strictEqual(item(onDisk[1]).iconPath, vscode.ThemeIcon.File);
     assert.deepStrictEqual((await tree.getChildren(onDisk[0])).map((n) => item(n).label), ['n.md']);
     const seanAll = await tree.getChildren((await tree.getChildren(sean))[1]);
     const hubUnderSean = seanAll.find((n) => item(n).label === 'c3-e/hub');
