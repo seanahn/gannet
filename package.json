@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "check": "for f in src/*.js bin/*.js; do [ ! -f \"$f\" ] || node --check \"$f\" || exit 1; done",
-    "test:offline": "node test/github.test.js && node test/accounts.test.js && node test/state.test.js && node test/checkout.test.js && node test/tokenServer.test.js && node test/fsProvider.test.js && node test/tree.test.js && node test/host.test.js",
+    "test:offline": "node test/github.test.js && node test/accounts.test.js && node test/state.test.js && node test/workspaces.test.js && node test/checkout.test.js && node test/tokenServer.test.js && node test/fsProvider.test.js && node test/tree.test.js && node test/host.test.js",
     "test": "npm run -s test:offline && node test/live.test.js"
   },
   "main": "./src/extension.js",
@@ -79,7 +79,7 @@
       },
       {
         "command": "gannet.checkoutTo",
-        "title": "Check Out to\u2026",
+        "title": "Check Out to…",
         "category": "Gannet"
       },
       {
@@ -218,7 +218,7 @@
         "gannet.checkoutFolder": {
           "type": "string",
           "default": "~/github",
-          "description": "The folder repos are checked out into. Check Out to\u2026 picks another place for one repo."
+          "description": "The folder repos are checked out into. Check Out to… picks another place for one repo."
         },
         "gannet.hiddenAccounts": {
           "type": "array",
@@ -230,5 +230,8 @@
         }
       }
     }
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.3.1"
   }
 }

@@ -20,9 +20,9 @@ EXT_ID = seanahn.gannet-$(VERSION)
 OLD_IDS =
 EXT_DIRS = /home/sahn/.vscode/extensions /home/sahn/.local/share/code-server/extensions /home/sahn/.vscode-server/extensions
 
-## Nothing to install: Gannet has no runtime dependencies
+## Install the one runtime dependency (jsonc-parser)
 deps:
-	@true
+	npm install --omit=dev --silent
 
 ## Syntax-check the extension sources
 check:
