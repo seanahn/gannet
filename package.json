@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "check": "for f in src/*.js bin/*.js; do [ ! -f \"$f\" ] || node --check \"$f\" || exit 1; done",
-    "test:offline": "node test/github.test.js && node test/accounts.test.js",
+    "test:offline": "node test/github.test.js && node test/accounts.test.js && node test/state.test.js",
     "test": "npm run -s test:offline"
   }
 }
