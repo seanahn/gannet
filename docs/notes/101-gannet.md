@@ -117,6 +117,97 @@ GANNET                                   [+ account] [⟳]
 - Binary files open the way VS Code opens any binary file. Files over 10 MB show a note instead and offer
   **Open on GitHub**. *(builder's call on the size)*
 
+## Workspaces
+
+Added after 0.1.0. Sean keeps repos two ways: locally, a VS Code workspace file (`fennets.code-workspace`, whose
+folders are repos under `/git`); on seclab, one folder (his home) with the repos as its subfolders. Gannet should
+know these places, show them first, and check repos out into them. *(Sean asked for workspaces at the top with a
+way to add one; the shape below is the builder's suggestion, which Sean accepted: "ok as you wish")*
+
+```
+GANNET
+▾ WORKSPACES                              [+]
+  ▾ fennets            ● this window
+     ▸ fennets
+     ▸ lattice
+  ▸ seclab-home        ~/
+▾ REPOS                                   [+ account] [⟳]
+  ▸ c3-sahn   gh
+  ▸ seanahn   gh
+```
+
+- A second view, **Workspaces**, above **Repos** in Gannet's sidebar. Each view collapses and resizes on its own,
+  and each header holds its own buttons. *(Sean: "as you wish")*
+- **Two kinds of workspace.** *(builder's suggestion, accepted)*
+  - **Workspace file** (`.code-workspace`): its folders are repos that live wherever they are. It has a **repo
+    folder** where Gannet puts new clones: the folder most of its folders sit in, else the folder the file sits
+    in; **Set repo folder…** changes it.
+  - **Folder**: its repos are its subfolders, and new clones go inside it.
+- **The list** is kept per machine (in global state, which under Remote-SSH lives on the remote), so seclab and
+  the local machine each have their own. *(guess, not corrected)* This window's workspace is listed
+  automatically, marked **● this window**, when it is a saved workspace file or a single folder. An untitled
+  multi-root window is not listed; its node reads **Untitled workspace — save it to list it**. *(builder's call)*
+- **Expanding a workspace** lists its folders (a workspace file's folders; a folder's subfolders), each opening
+  with its files from disk. A folder whose `origin` is on github.com shows as a repo, with **● local** and its
+  push account, and the repo actions of a checked-out repo. *(builder's call)*
+- **+** offers: **Add workspace file…**, **Add folder…**, **New workspace…** (asks a name and the repo folder,
+  creates `<repo folder>/<name>.code-workspace` with no folders). *(builder's call)*
+- On a workspace: click or **Open** opens it in a new window; **Open here** replaces this window; **Remove from
+  list** forgets it and deletes nothing. Opening a workspace is always the user's explicit action; checkout never
+  opens a window. *(builder's call, in line with Sean's "do not open a new window" for checkout)*
+- A workspace whose file or folder is gone shows **Missing** with **Remove from list**. *(builder's call)*
+
+**Checkout with workspaces** (replaces the default-folder rule below when a workspace applies):
+
+- **Check out** goes to this window's workspace: into a folder workspace's folder, or into a workspace file's
+  repo folder and then added to it. With no listed workspace (an empty or untitled window), it goes to
+  `gannet.checkoutFolder` and is appended to the window, as before. *(builder's suggestion, accepted)*
+- In a folder window, a clone inside the folder already shows in Explorer, so no workspace folder is added — and
+  the window does not turn multi-root or restart extensions. *(builder's call)*
+- **Check out to…** lists the workspaces first, then **Other folder…** (the old folder picker). Choosing a
+  workspace other than this window's clones the repo there and, for a workspace file, writes the new folder into
+  that file; this window does not change. The file is edited in place, keeping its comments and other settings,
+  with the folder path written relative to the file when it lies under the file's folder. *(builder's
+  suggestion, accepted; builder's call on the path form)*
+- **A repo already checked out somewhere is reused, never cloned again.** *(Sean: "Reuse the copy you have")*
+  Checking it out into another workspace adds its existing folder to that workspace (written into a workspace
+  file; for a folder workspace it cannot be added, so a note says where the repo already is and offers **Reveal
+  in Explorer**). One copy per repo per machine; its push account is unchanged.
+- A single folder that is itself a git repo (one repo opened alone) is not a workspace: it is not listed, and
+  **Check out** there falls back to `gannet.checkoutFolder`, so a repo is never cloned inside a repo. *(builder's
+  call)*
+- Workspaces shown **Missing** are not offered in **Check out to…**. *(builder's call)*
+- Writing another workspace file re-reads it just before the write, so a change another window made is kept. If
+  the file cannot be parsed or written, the clone stays and is remembered, and a note gives its path and the
+  file that could not be updated. *(builder's call)*
+- The pending checkout record names its target workspace; one cut off by a restart finishes into that workspace,
+  never into this window. *(builder's call)*
+- Every listed workspace's repo folder or folder is scanned on start, like the default folder, so repos there
+  show **● local** in Repos; partial clones left by dead windows are removed there too. *(builder's call)*
+- The rest of Checkout (target naming, partial folders, push account, queue) is unchanged.
+
+Checking out into a workspace:
+
+```
+ User        Workspaces/Repos view     Checkout          git / Disk        Workspace file      This window
+  |                |                      |                    |                  |                 |
+  |-- Check out to… -> pick workspace W (Missing ones not offered)               |                 |
+  |                |-- checkout(repo, W) ->|                    |                  |                 |
+  |                |                      |-- save pending {repo, account, W}     |                 |
+  |                |                      | [repo already local at P]  no clone; target = P         |
+  |                |                      |-- clone into W's repo folder (partial, rename) -------->|  |
+  |                |                      | [clone fails / Cancel]  partial removed, error shown    |
+  |                |                      |-- push settings, remember path ----->|                  |
+  |                |                      | [W is this window, file]  updateWorkspaceFolders ------------------->|
+  |                |                      | [W is this window, folder]  nothing to add (already inside)          |
+  |                |                      | [W is another file]  re-read, add folder, write ------>|          |
+  |                |                      |   [unparseable / read-only]  note: cloned at P, W not updated       |
+  |                |                      | [W is another folder, repo elsewhere]  note: already at P, Reveal  |
+  |                |                      |-- clear pending   |                  |                 |
+  |                |                      | [cut off by a restart]  next start resumes into W, never this window
+  |<-- W's node lists the repo; Repos shows ● local                                                  |
+```
+
 ## Checkout
 
 - **Default folder:** setting `gannet.checkoutFolder`, default `~/github`. A repo goes to `<folder>/<repo>`; if
@@ -213,7 +304,7 @@ Rulings settled while planning the build, all builder's calls:
   folder in VS Code's explorer when it is a workspace folder, and in the system's file manager otherwise.
 - Known gaps, left for later: the All repos count does not show; **More files** links break for branch names
   with `/`; mixed-case logins may not reopen `gannet:` editors after a restart; partial folders outside the
-  default checkout folder are not cleaned; logins are not validated before being written into git config.
+  default checkout folder and the listed workspaces' folders are not cleaned; logins are not validated before being written into git config.
 
 ## Flows
 
