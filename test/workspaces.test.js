@@ -71,6 +71,20 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gannet-ws-'));
       await assert.rejects(W.addFolderToFile(bad, '/r'));
     }
 
+    // review fix: an edit keeps the file's own indentation and line endings; the lines it does not touch stay as they were
+    {
+      const f = path.join(tmp, 'two.code-workspace');
+      const orig = ['{', '  "folders": [', '    {', '      "path": "a"', '    }', '  ],', '  "settings": { "x": 1 }', '}', ''].join('\r\n');
+      fs.writeFileSync(f, orig);
+      await W.addFolderToFile(f, path.join(tmp, 'b'));
+      const out = fs.readFileSync(f, 'utf8');
+      assert.ok(!out.includes('\t'), JSON.stringify(out));
+      assert.ok(!/[^\r]\n/.test(out), 'CRLF kept: ' + JSON.stringify(out));
+      const lines = out.split('\r\n');
+      for (const l of ['{', '  "folders": [', '    {', '      "path": "a"', '  ],', '  "settings": { "x": 1 }', '}']) assert.ok(lines.includes(l), `kept ${JSON.stringify(l)} in ${JSON.stringify(out)}`);
+      assert.ok(lines.includes('      "path": "b"'), JSON.stringify(out));
+    }
+
     // a new workspace file
     {
       const dir = path.join(tmp, 'new');

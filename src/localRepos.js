@@ -70,4 +70,4 @@ function createLocalRepos({ memento, home = os.homedir() }) {
   };
 }
 
-module.exports = { createLocalRepos, parseOrigin, originOf, expandHome, isDir, PARTIAL, partialOf };
+module.exports = { createLocalRepos, parseOrigin, originOf, expandHome, isDir, PARTIAL, partialOf, alive };

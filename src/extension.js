@@ -12,6 +12,8 @@ const { startTokenServer, writeShim, socketDir } = require('./tokenServer.js');
 const { GannetFs, toUri } = require('./fsProvider.js');
 const { GannetTree } = require('./tree.js');
 const W = require('./workspaces.js');
+const { createMachineState } = require('./machineState.js');
+const { alive } = require('./localRepos.js');
 const { WorkspaceTree } = require('./workspaceTree.js');
 
 let state = null;
@@ -30,8 +32,13 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     return clients.get(login);
   };
   const recent = createRecent(context.globalState);
-  const local = createLocalRepos({ memento: context.globalState, home });
-  const workspaces = W.createWorkspaces({ memento: context.globalState, home });
+  const machine = createMachineState(path.join(store, 'machine.json'));
+  if (!machine.exists()) {   // 0.1.0 kept checkouts in globalState: carry them over; forgetMissing drops other machines'
+    const old = context.globalState.get('gannet.local');
+    if (old) await machine.update('gannet.local', old);
+  }
+  const local = createLocalRepos({ memento: machine, home });
+  const workspaces = W.createWorkspaces({ memento: machine, home });
   // this window's workspace (a saved workspace file, or one folder that is not a repo), as stored with its settings
   const thisWs = () => { const c = W.currentWorkspace(vscode.workspace); return c && !c.untitled ? (workspaces.get(c.path) || c) : null; };
   const here = thisWs();
@@ -109,14 +116,14 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   }
 
   // checkouts not yet in the workspace, kept so one cut off by an extension restart is resumed on the next start
-  const pending = () => context.globalState.get(PENDING, []) || [];
-  const setPending = (list) => context.globalState.update(PENDING, list);
+  const pending = () => machine.get(PENDING, []) || [];
+  const setPending = (list) => machine.update(PENDING, list);
   const samePending = (a, b) => a.repo.fullName === b.repo.fullName && a.folder === b.folder;
 
   async function doCheckout(node, folder, workspace = null) {
     if (!node || !node.repo) return;
     const { repo, account } = node;
-    const job = { repo, account, folder, workspace };
+    const job = { repo, account, folder, workspace, pid: process.pid };   // the window doing it
     await setPending([...pending().filter((j) => !samePending(j, job)), job]);
     try {
       const res = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Checking out ${repo.fullName}`, cancellable: true },
@@ -248,7 +255,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   );
 
   // resume checkouts an extension restart cut off, one after another, without holding up activation
-  state.resumed = (async () => { for (const job of pending()) await doCheckout({ kind: 'repo', repo: job.repo, account: job.account }, job.folder, job.workspace || null); })();
+  state.resumed = (async () => { for (const job of pending().filter((j) => !(j.pid && alive(j.pid)))) await doCheckout({ kind: 'repo', repo: job.repo, account: job.account }, job.folder, job.workspace || null); })();
 }
 
 function activate(context) { return activateWith(context); }

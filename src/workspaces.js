@@ -67,6 +67,14 @@ function readFolders(file) {
     .map((f) => path.resolve(dir, expandHome(f.path)));
 }
 
+/** The file's own indentation and line endings, so an edit matches what is there. */
+function styleOf(text) {
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
+  const m = /\n([ \t]+)\S/.exec(text);
+  if (m && m[1][0] === '\t') return { insertSpaces: false, tabSize: 4, eol };
+  return { insertSpaces: true, tabSize: m ? m[1].length : 2, eol };
+}
+
 async function addFolderToFile(file, folder) {
   const { text, data } = parseFile(file);   // read just before writing, so another window's change is kept
   const dir = path.dirname(file);
@@ -75,7 +83,7 @@ async function addFolderToFile(file, folder) {
   const rel = path.relative(dir, target);
   const entry = { path: rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel.split(path.sep).join('/') : target };
   const at = Array.isArray(data.folders) ? data.folders.length : 0;
-  const fmt = { formattingOptions: { insertSpaces: false, tabSize: 1, eol: '\n' } };
+  const fmt = { formattingOptions: styleOf(text) };
   const edits = Array.isArray(data.folders)
     ? jsonc.modify(text, ['folders', at], entry, { ...fmt, isArrayInsertion: true })
     : jsonc.modify(text, ['folders'], [entry], fmt);

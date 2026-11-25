@@ -10,6 +10,10 @@ const { fakeVscode, installVscode, makeMemento, Uri } = require('./stubs.js');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gannet-host-'));
 const sh = (cmd, cwd) => childProcess.execSync(cmd, { cwd, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } }).toString();
 const manifest = require('../package.json');
+// what Gannet keeps per machine lives in a file in its storage folder (on the remote under Remote-SSH), not globalState
+const machineFile = (c) => path.join(c.globalStorageUri.fsPath, 'machine.json');
+const machine = (c) => { try { return JSON.parse(fs.readFileSync(machineFile(c), 'utf8')); } catch { return {}; } };
+const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.dirname(machineFile(c)), { recursive: true }); fs.writeFileSync(machineFile(c), JSON.stringify(m)); return c; };
 
 (async () => {
   try {
@@ -69,7 +73,7 @@ const manifest = require('../package.json');
     assert.ok(refused.items.includes('Add to workspace'), JSON.stringify(refused));
     opts.refuseFolders = false;
     opts.quickPick = undefined;
-    assert.deepStrictEqual(context.globalState.get('gannet.workspaces', []), [], 'a repo window is not listed');
+    assert.deepStrictEqual(machine(context)['gannet.workspaces'] || [], [], 'a repo window is not listed');
 
     // a failing clone: git's line, nothing left behind
     await vscode.commands.executeCommand('gannet.checkout', { kind: 'repo', account, repo: { ...repo, fullName: 'seanahn/nope', name: 'nope', cloneUrl: path.join(tmp, 'missing.git') } });
@@ -114,14 +118,14 @@ const manifest = require('../package.json');
     // review fix: a checkout cut off by an extension restart is resumed on the next start;
     // and with no helper for VS Code accounts, no broken push setting is written
     {
-      const context2 = { globalState: makeMemento({ 'gannet.pending': [{ repo: { ...repo, fullName: 'seanahn/later', name: 'later' }, account: { login: 'vsuser', source: 'vscode' }, folder: path.join(tmp, 'resumed') }] }), subscriptions: [], globalStorageUri: Uri.file(path.join(tmp, 'store2')), extensionPath: path.join(__dirname, '..') };
+      const context2 = seed({ globalState: makeMemento(), subscriptions: [], globalStorageUri: Uri.file(path.join(tmp, 'store2')), extensionPath: path.join(__dirname, '..') }, 'gannet.pending', [{ repo: { ...repo, fullName: 'seanahn/later', name: 'later' }, account: { login: 'vsuser', source: 'vscode' }, folder: path.join(tmp, 'resumed') }]);
       vscode.accounts.push({ id: 'v', label: 'vsuser' });
       vscode.tokens.vsuser = 'vs-token';
       await ext.activateWith(context2, { run, fetch, home, startServer: async () => { throw new Error('no sockets here'); } });
       await ext._state().resumed;
       const later = path.join(tmp, 'resumed', 'later');
       assert.ok(fs.existsSync(path.join(later, 'a.txt')), 'resumed');
-      assert.deepStrictEqual(context2.globalState.get('gannet.pending'), [], 'and no longer pending');
+      assert.deepStrictEqual(machine(context2)['gannet.pending'], [], 'and no longer pending');
       const helpers = (() => { try { return sh('git config --local --get-all credential.https://github.com.helper', later); } catch { return ''; } })();
       assert.strictEqual(helpers, '', 'no helper written when it cannot work');
       assert.strictEqual(ext._state().local.get('seanahn/later').login, null, 'so the tree offers Push as later');
@@ -152,7 +156,8 @@ const manifest = require('../package.json');
       await ext.activateWith(c3, { run, fetch, home });
       const ids = rec.trees.slice(before).map((x) => x.id);
       assert.ok(ids.indexOf('gannet.workspaces') >= 0 && ids.indexOf('gannet.workspaces') < ids.indexOf('gannet.repos'), JSON.stringify(ids));
-      assert.deepStrictEqual(c3.globalState.get('gannet.workspaces').map((w) => w.path), [main]);
+      assert.deepStrictEqual(machine(c3)['gannet.workspaces'].map((w) => w.path), [main]);
+      assert.strictEqual(c3.globalState.get('gannet.workspaces'), undefined, 'not in globalState, which Remote-SSH keeps on the client');
       assert.ok(!fs.existsSync(path.join(G, 'old.gannet-partial-999999999')), 'partials cleaned in the repo folder');
 
       // Check out: into the repo folder (/git here), added to this window
@@ -205,7 +210,7 @@ const manifest = require('../package.json');
       opts.folders = [homeWs];
       const c4 = ctx();
       await ext.activateWith(c4, { run, fetch, home });
-      assert.ok(c4.globalState.get('gannet.workspaces').some((w) => w.path === homeWs && w.kind === 'folder'));
+      assert.ok(machine(c4)['gannet.workspaces'].some((w) => w.path === homeWs && w.kind === 'folder'));
       const ups = rec.folderUpdates.length;
       await ckout('homerepo');
       assert.ok(fs.existsSync(path.join(homeWs, 'homerepo', 'a.txt')));
@@ -216,12 +221,18 @@ const manifest = require('../package.json');
     // a checkout cut off by a restart finishes into its workspace, never this window
     {
       const other = path.join(t, 'other', 'other.code-workspace');
-      const c5 = ctx({ 'gannet.pending': [{ repo: R('later2'), account, folder: path.join(t, 'other'), workspace: { kind: 'file', path: other, name: 'other' } }] });
+      // and one still owned by a live window (this process stands in for it) is left to that window
+      const c5 = seed(ctx(), 'gannet.pending', [
+        { repo: R('later2'), account, folder: path.join(t, 'other'), workspace: { kind: 'file', path: other, name: 'other' }, pid: 999999999 },
+        { repo: R('busy'), account, folder: path.join(t, 'other'), workspace: null, pid: process.pid },
+      ]);
       const ups = rec.folderUpdates.length;
       await ext.activateWith(c5, { run, fetch, home });
       await ext._state().resumed;
       assert.ok(W.readFolders(other).includes(path.join(t, 'other', 'later2')));
       assert.strictEqual(rec.folderUpdates.length, ups);
+      assert.ok(!fs.existsSync(path.join(t, 'other', 'busy')), 'another window is still on it');
+      assert.deepStrictEqual(machine(c5)['gannet.pending'].map((j) => j.repo.name), ['busy']);
 
       // + : New workspace…, Add folder…, a repo folder refused; Remove, Open, Open here, Set repo folder
       const ws = ext._state().workspaces;
@@ -263,6 +274,15 @@ const manifest = require('../package.json');
       assert.strictEqual(ws.get(team), undefined);
       assert.ok(fs.existsSync(team), 'nothing deleted');
       opts.quickPick = undefined; opts.inputBox = undefined;
+      await ext.deactivate();
+    }
+    // where 0.1.0 kept repos in globalState, those still on disk carry over, with their push account
+    {
+      const old = path.join(G, 'mainrepo');
+      const c6 = { globalState: makeMemento({ 'gannet.local': { 'seanahn/mainrepo': { path: old, login: 'seanahn', byGannet: true }, 'x/gone': { path: path.join(t, 'nowhere'), login: 'x', byGannet: true } } }), subscriptions: [], globalStorageUri: Uri.file(path.join(t, 'store-m')), extensionPath: path.join(__dirname, '..') };
+      await ext.activateWith(c6, { run, fetch, home });
+      assert.strictEqual(ext._state().local.get('seanahn/mainrepo').login, 'seanahn');
+      assert.strictEqual(ext._state().local.get('x/gone'), undefined);
       await ext.deactivate();
     }
     console.log('HOST OK');
