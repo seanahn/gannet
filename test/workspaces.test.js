@@ -1,11 +1,11 @@
 'use strict';
-// Workspaces: the list Gannet keeps, which workspace this window has, and reading and editing .code-workspace files.
+// Workspaces: the directories Gannet keeps checkouts in, which one a checkout belongs to, and carrying 0.2.0's list
+// (folders and .code-workspace files) and the old checkout folder over, once.
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const jsonc = require('jsonc-parser');
-const { makeMemento, Uri } = require('./stubs.js');
+const { makeMemento } = require('./stubs.js');
 const W = require('../src/workspaces.js');
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gannet-ws-'));
@@ -19,107 +19,80 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gannet-ws-'));
     {
       const memento = makeMemento();
       const ws = W.createWorkspaces({ memento, home });
-      await ws.add({ kind: 'folder', path: path.join(home, 'x'), name: 'x' });
-      await ws.add({ kind: 'folder', path: '~/x', name: 'x' });
-      assert.strictEqual(ws.list().length, 1, 'the same path once');
-      assert.strictEqual(ws.get('~/x').path, path.join(home, 'x'));
-      await ws.add({ kind: 'file', path: '/a/f.code-workspace', name: 'f' });
-      await ws.setRepoFolder('/a/f.code-workspace', '/git');
-      assert.strictEqual(W.createWorkspaces({ memento, home }).get('/a/f.code-workspace').repoFolder, '/git', 'persisted');
+      await ws.add('~/x');
+      await ws.add(path.join(home, 'x'));
+      await ws.add('/b');
+      assert.deepStrictEqual(ws.list(), [path.join(home, 'x'), '/b'], 'once each, in the order added');
+      assert.deepStrictEqual(memento.get(W.KEY), [path.join(home, 'x'), '/b']);
       await ws.remove('~/x');
-      assert.deepStrictEqual(ws.list().map((w) => w.name), ['f']);
+      assert.deepStrictEqual(ws.list(), ['/b']);
     }
 
-    // this window's workspace
+    // which workspace a checkout belongs to: the deepest listed one
     {
-      const plain = path.join(tmp, 'plain');
+      const list = [home, path.join(home, 'github')];
+      assert.strictEqual(W.workspaceOf(path.join(home, 'github', 'perch'), list), path.join(home, 'github'));
+      assert.strictEqual(W.workspaceOf(path.join(home, 'other', 'r'), list), home);
+      assert.strictEqual(W.workspaceOf('/elsewhere/r', list), null);
+      assert.strictEqual(W.workspaceOf(path.join(home + 'x', 'r'), [home]), null, 'a prefix is not a parent');
+      assert.strictEqual(W.labelOf(path.join(home, 'github', 'perch'), list, home), '~/github');
+      assert.strictEqual(W.labelOf(path.join(home, 'other', 'r'), list, home), '~');
+      assert.strictEqual(W.labelOf('/elsewhere/r', list, home), '/elsewhere');
+      assert.strictEqual(W.tilde('/git', home), '/git');
+    }
+
+    // JSON with comments and trailing commas, as .code-workspace files are
+    {
+      assert.deepStrictEqual(W.parseJsonc('{ "a": "//x", /* c */ "b": [1,], // d\n }'), { a: '//x', b: [1] });
+      assert.deepStrictEqual(W.parseJsonc('{ "a": "x\\"/*y*/" }'), { a: 'x"/*y*/' });
+      assert.throws(() => W.parseJsonc('{ "a": [ oops'));
+    }
+
+    // carrying 0.2.0's list and the old checkout folder over
+    {
+      const wdir = path.join(tmp, 'w');
+      fs.mkdirSync(wdir);
+      const wsFile = path.join(wdir, 'main.code-workspace');
+      fs.writeFileSync(wsFile, '{ // team\n "folders": [ {"path": "/git/a"}, {"path": "/git/b"}, {"path": "/home/c"}, ],\n}\n');
+      const setFile = path.join(wdir, 'set.code-workspace');
+      fs.writeFileSync(setFile, '{ "folders": [] }');
+      const badFile = path.join(wdir, 'bad.code-workspace');
+      fs.writeFileSync(badFile, '{ "folders": [ oops');
+      const F = path.join(tmp, 'f');
+      fs.mkdirSync(path.join(home, 'github'));
+      const memento = makeMemento({ [W.KEY]: [
+        { kind: 'folder', path: F, name: 'f' },
+        { kind: 'file', path: wsFile, name: 'main' },
+        { kind: 'file', path: setFile, name: 'set', repoFolder: '/r' },
+        { kind: 'file', path: badFile, name: 'bad' },
+        { kind: 'folder', path: '/git', name: 'git' },
+      ] });
+      await W.migrate({ memento, home, checkoutFolder: '~/github' });
+      const ws = W.createWorkspaces({ memento, home });
+      assert.deepStrictEqual(ws.list(), [F, '/git', '/r', wdir, path.join(home, 'github')]);
+      assert.strictEqual(memento.get(W.MIGRATED), 3);
+      // Review Focus 5: removed after the upgrade, it stays removed
+      await ws.remove('~/github');
+      await W.migrate({ memento, home, checkoutFolder: '~/github' });
+      assert.deepStrictEqual(ws.list(), [F, '/git', '/r', wdir]);
+    }
+
+    // a fresh install: nothing listed unless the old checkout folder exists
+    {
+      const memento = makeMemento();
+      await W.migrate({ memento, home: path.join(tmp, 'nohome'), checkoutFolder: undefined });
+      assert.deepStrictEqual(W.createWorkspaces({ memento, home }).list(), []);
+      assert.strictEqual(memento.get(W.MIGRATED), 3);
+    }
+
+    // existence, and git repos
+    {
       const repo = path.join(tmp, 'repo');
-      fs.mkdirSync(plain);
       fs.mkdirSync(path.join(repo, '.git'), { recursive: true });
-      const folder = (p) => ({ uri: Uri.file(p) });
-      assert.deepStrictEqual(W.currentWorkspace({ workspaceFile: Uri.file('/a/f.code-workspace'), workspaceFolders: [] }), { kind: 'file', path: '/a/f.code-workspace', name: 'f' });
-      assert.deepStrictEqual(W.currentWorkspace({ workspaceFile: Uri.parse('untitled:Untitled-1'), workspaceFolders: [folder(plain), folder(repo)] }), { untitled: true });
-      assert.deepStrictEqual(W.currentWorkspace({ workspaceFolders: [folder(plain)] }), { kind: 'folder', path: plain, name: 'plain' });
-      assert.strictEqual(W.currentWorkspace({ workspaceFolders: [folder(repo)] }), null, 'one repo opened alone is not a workspace');
-      assert.strictEqual(W.currentWorkspace({ workspaceFolders: [folder(plain), folder(repo)] }), null);
-      assert.strictEqual(W.currentWorkspace({ workspaceFolders: undefined }), null);
+      assert.strictEqual(W.exists(home), true);
+      assert.strictEqual(W.exists(path.join(tmp, 'nope')), false);
       assert.strictEqual(W.isGitRepo(repo), true);
-      assert.strictEqual(W.isGitRepo(plain), false);
-    }
-
-    // reading and editing a workspace file with comments and trailing commas (Review Focus 1, 2, 4)
-    {
-      const dir = path.join(tmp, 'w');
-      fs.mkdirSync(dir);
-      const file = path.join(dir, 'main.code-workspace');
-      fs.writeFileSync(file, '{ // c\n "folders": [ {"path": "."}, {"path": "../x"}, {"uri": "vscode-remote://h/p"}, ],\n "settings": {"a": 1}, }\n');
-      assert.deepStrictEqual(W.readFolders(file), [dir, path.join(tmp, 'x')]);
-      assert.strictEqual(await W.addFolderToFile(file, path.join(dir, 'new')), 'added');
-      assert.strictEqual(await W.addFolderToFile(file, '/elsewhere/r'), 'added');
-      const text = fs.readFileSync(file, 'utf8');
-      assert.ok(text.includes('// c'), 'comment kept');
-      const parsed = jsonc.parse(text);
-      assert.strictEqual(parsed.folders.length, 5);
-      assert.deepStrictEqual(parsed.folders.slice(3), [{ path: 'new' }, { path: '/elsewhere/r' }]);
-      assert.deepStrictEqual(parsed.settings, { a: 1 });
-      assert.strictEqual(await W.addFolderToFile(file, path.join(dir, 'new')), 'present');
-      assert.strictEqual(await W.addFolderToFile(file, path.join(tmp, 'x')), 'present', 'listed as ../x');
-      await assert.rejects(W.addFolderToFile(path.join(tmp, 'gone.code-workspace'), '/r'));
-      const bad = path.join(tmp, 'bad.code-workspace');
-      fs.writeFileSync(bad, '{ "folders": [ oops');
-      assert.throws(() => W.readFolders(bad));
-      await assert.rejects(W.addFolderToFile(bad, '/r'));
-    }
-
-    // review fix: an edit keeps the file's own indentation and line endings; the lines it does not touch stay as they were
-    {
-      const f = path.join(tmp, 'two.code-workspace');
-      const orig = ['{', '  "folders": [', '    {', '      "path": "a"', '    }', '  ],', '  "settings": { "x": 1 }', '}', ''].join('\r\n');
-      fs.writeFileSync(f, orig);
-      await W.addFolderToFile(f, path.join(tmp, 'b'));
-      const out = fs.readFileSync(f, 'utf8');
-      assert.ok(!out.includes('\t'), JSON.stringify(out));
-      assert.ok(!/[^\r]\n/.test(out), 'CRLF kept: ' + JSON.stringify(out));
-      const lines = out.split('\r\n');
-      for (const l of ['{', '  "folders": [', '    {', '      "path": "a"', '  ],', '  "settings": { "x": 1 }', '}']) assert.ok(lines.includes(l), `kept ${JSON.stringify(l)} in ${JSON.stringify(out)}`);
-      assert.ok(lines.includes('      "path": "b"'), JSON.stringify(out));
-    }
-
-    // a new workspace file
-    {
-      const dir = path.join(tmp, 'new');
-      fs.mkdirSync(dir);
-      const f = W.createWorkspaceFile(dir, 'team');
-      assert.strictEqual(f, path.join(dir, 'team.code-workspace'));
-      assert.strictEqual(fs.readFileSync(f, 'utf8'), '{\n\t"folders": [],\n\t"settings": {}\n}\n');
-      assert.throws(() => W.createWorkspaceFile(dir, 'team'));
-    }
-
-    // where new clones go
-    {
-      const dir = path.join(tmp, 'rf');
-      fs.mkdirSync(dir);
-      const f = path.join(dir, 'w.code-workspace');
-      fs.writeFileSync(f, JSON.stringify({ folders: [{ path: '/git/a' }, { path: '/home/c' }, { path: '/git/b' }] }));
-      assert.strictEqual(W.repoFolderOf({ kind: 'file', path: f }), '/git');
-      assert.strictEqual(W.repoFolderOf({ kind: 'file', path: f, repoFolder: '/elsewhere' }), '/elsewhere');
-      fs.writeFileSync(f, JSON.stringify({ folders: [{ path: '/b/x' }, { path: '/a/y' }] }));
-      assert.strictEqual(W.repoFolderOf({ kind: 'file', path: f }), '/b', 'a tie goes to the first');
-      fs.writeFileSync(f, JSON.stringify({ folders: [] }));
-      assert.strictEqual(W.repoFolderOf({ kind: 'file', path: f }), dir);
-      assert.strictEqual(W.repoFolderOf({ kind: 'file', path: path.join(dir, 'gone.code-workspace') }), dir);
-      assert.strictEqual(W.repoFolderOf({ kind: 'folder', path: '/s/home' }), '/s/home');
-    }
-
-    // a folder workspace's folders; existence
-    {
-      const dir = path.join(tmp, 'fw');
-      for (const n of ['Beta', 'alpha', '.hidden', 'x.gannet-partial-1']) fs.mkdirSync(path.join(dir, n), { recursive: true });
-      fs.writeFileSync(path.join(dir, 'file.txt'), '');
-      assert.deepStrictEqual(W.foldersOf({ kind: 'folder', path: dir }), [path.join(dir, 'alpha'), path.join(dir, 'Beta')]);
-      assert.strictEqual(W.exists({ kind: 'folder', path: dir }), true);
-      assert.strictEqual(W.exists({ kind: 'folder', path: path.join(tmp, 'nope') }), false);
-      assert.strictEqual(W.exists({ kind: 'file', path: path.join(tmp, 'w', 'main.code-workspace') }), true);
+      assert.strictEqual(W.isGitRepo(home), false);
     }
     console.log('WORKSPACES OK');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
