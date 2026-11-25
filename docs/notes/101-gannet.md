@@ -98,7 +98,8 @@ GANNET                                   [+ account] [⟳]
 - Expanding it fetches every repo the account can reach (`GET /user/repos`, owner + collaborator + org member,
   all pages), sorted by `owner/name`, shown as a flat list. *(builder's call; grouping by owner is possible
   later)*
-- Fetched once per session and cached; the ⟳ button refreshes.
+- Fetched once per session and cached; the ⟳ button refreshes. *(0.3.0: cached on disk across sessions, see
+  below)*
 - Opening a repo from here puts it at the top of Recent.
 
 ### A repo node
@@ -130,10 +131,12 @@ GANNET
     /git
     ~/github
 ▾ REPOS                                         [+ account] [⟳]
-  ▾ c3-e  (c3-sahn)
+  ▾ c3-e                     via c3-sahn
       c3reliability          private
       c3nexus                ~/ · /git            (green Octocat: checked out)
       ▸ All repos
+  ▸ c3-sahn
+  ▸ c3-taehokgil             via c3-sahn
   ▾ seanahn
       perch                  /git
       ▸ All repos
@@ -141,11 +144,17 @@ GANNET
 
 ### The tree is grouped by owner
 
-- The top-level nodes are **owners**, meaning the GitHub users and organizations whose repos an account can reach.
-  An owner reached through an account with a different login is labelled with that account in brackets:
-  `c3-e (c3-sahn)`. The account's own owner node is just its login: `seanahn`. *(Sean)*
-- An owner reachable through two accounts gets two nodes, one per account, each with its account in brackets.
+- The top-level nodes are **owners**, meaning the GitHub users and organizations whose repos an account can reach,
+  labelled with the owner alone: `c3-e`, `c3-sahn`, `c3-taehokgil`, `seanahn`. There are no account nodes. *(Sean:
+  "c3-e, c3-sahn, c3-taehokgil and seanahn nodes")* An owner reached through an account with another login says
+  so in its description: `via c3-sahn`. *(builder's call, in place of 0.3.0's first draft `c3-e (c3-sahn)`)*
+- An owner reachable through two accounts gets two nodes, one per account, told apart by their `via`.
   *(builder's call)*
+- **Which start expanded:** an account's organizations start expanded; the account's own login and other users'
+  owners start collapsed, unless the account has no organizations, when its own login starts expanded. So
+  `c3-e` and `seanahn` open, `c3-sahn` and `c3-taehokgil` closed. *(Sean: "collapse all others except for
+  c3-e"; the rule is the builder's)* Owner nodes carry ids, so VS Code remembers what Sean opens or closes
+  after that.
 - The owners shown for an account:
   - the account's own login;
   - its organizations (`GET /user/orgs`);
@@ -158,6 +167,12 @@ GANNET
   account can reach. *(Sean: "per owner")* Recent per owner works as before (repos used in Gannet first, then
   GitHub's recently pushed list), filtered to that owner, at most 10. All repos is the account's full list,
   fetched once and shared by all its owner nodes, filtered to the owner.
+- **The full list is cached on disk, once read.** Fetching every page takes long for an account that reaches many
+  repos, so after the first fetch each account's list is kept in a file in Gannet's global storage and used on
+  every later start, in every window, with no fetch. Only ⟳ fetches it again (and replaces the file); the
+  tooltip on All repos says when it was fetched. *(Sean: "cache the list once read")* With the list on disk, the
+  owners found in it (such as `c3-taehokgil`) show from the start. A repo created since shows in Recent once
+  pushed to, and in All repos after ⟳. *(builder's call)*
 - Account things live on the account's own node:
   - its source (`gh` or `VS Code`) in the tooltip;
   - **Hide account**;
