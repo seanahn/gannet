@@ -6,46 +6,54 @@ account it came from.
 
 ## What you see
 
-A **Gannet** icon in the activity bar opens two views: a small **Workspaces** panel on top, and the repos tree:
+A **Gannet** icon in the activity bar opens one sidebar: the directories you keep checkouts in on top, and your
+repos, grouped by owner, below.
 
 ```
-▾ WORKSPACES                       [+]
-    /git
-    ~/github
-▾                                  [+ account] [⟳]
-  ▾ c3-e              via c3-sahn
-    ▸ Recent
-    ▸ All repos       312
-  ▸ c3-sahn
-  ▸ c3-taehokgil      via c3-sahn
-  ▾ seanahn
-    ▾ Recent
-      ▸ perch         /git · ~/github      (green Octocat: checked out)
-    ▸ All repos       143
+GANNET                               [+ account] [⟳]
+  /git                                  [📂] [✕]     (buttons show on hover)
+  ~/github                              [📂] [✕]
+  + Add folder…
+ ───────────────────────────────────────────────
+ ▾ (org) c3-e                via c3-sahn
+   ▸ (cat) c3nexus           private · ~
+   ▸ All repos               312
+ ▸ (person) c3-sahn
+ ▾ (person) seanahn
+   ▾ (green cat) perch       /git · ~/github       (checked out twice: one row each)
+     ▾ /git/perch
+       ▸ src
+         (file) README.md
+     ▸ ~/github/perch
+   ▸ All repos               143
 ```
 
-- **Owners.** The tree is grouped by owner: each account you are signed in to, each organization it belongs to,
-  and every other owner it can reach repos of (shown `via <account>`). Organizations start expanded; an account
-  that belongs to organizations starts collapsed. **+** adds a VS Code account; **Hide Account** (right-click an
-  account) keeps one out of the tree and never signs anything out.
-- **Recent.** Per owner, up to 10 repos: the ones you opened or checked out in Gannet first, then GitHub's
-  recently pushed.
-- **All repos.** Per owner, every repo of that owner the account can reach. The account's full list is fetched
-  once and kept on disk, so later starts and other windows show it at once; its tooltip says when it was fetched.
-  **⟳** marks every list stale, and the next opening fetches it again.
+- **Owners.** Each account you are signed in to, each organization it belongs to, and every other owner it can
+  reach repos of (shown `via <account>`) is a top-level row. Organizations start expanded; an account that belongs
+  to organizations starts collapsed. **+** adds a VS Code account; **Hide Account** (right-click an account) keeps
+  one out of the list and never signs anything out.
+- **Recent repos.** Under an owner come up to 10 repos: the ones you opened or checked out in Gannet first, then
+  GitHub's recently pushed. Then **All repos**: every repo of that owner the account can reach. The account's full
+  list is fetched once and kept on disk, so later starts and other windows show it at once; its tooltip says when
+  it was fetched. **⟳** marks every list stale, and the next opening fetches it again.
 - **Checked out.** A repo checked out on this machine has a green Octocat, and lists where its checkouts are. One
-  checkout expands to its files on disk; several expand to one node per checkout.
-- **Files.** Expanding a folder of a repo that is only on GitHub fetches just that folder. Files open read-only.
-  Files over 10 MB offer **Open on GitHub** instead.
+  checkout expands to its files on disk; several expand to one row per checkout. Hovering shows each checkout's
+  path, its branch, and the account it pushes as; a repo only on GitHub says **Only on GitHub**.
+- **Files.** Folders have only an arrow; files have a file icon. Expanding a folder of a repo that is only on
+  GitHub fetches just that folder. Files open read-only. Files over 10 MB offer **Open on GitHub** instead.
+- **Using it.** Clicking a row opens or toggles it; what is expanded is remembered across reloads. Right-click a
+  row for its menu (Check Out, Check Out to…, Reveal, Add to Window, Push as This Account, Open on GitHub, Hide
+  Account). With the list focused, Up/Down move, Right/Left expand and collapse, Enter or Space clicks.
 
 ## Workspaces
 
-The **Workspaces** panel lists the directories you keep checkouts in on this machine, such as `/git` and
-`~/github` locally or `~/` on a remote machine. **+** adds a directory (not a repo itself); **Reveal in File
-Manager** shows one; **Remove from List** forgets it and deletes nothing. A directory that is gone shows
-**Missing**. Each machine has its own list, and every listed directory is scanned on start for clones. Upgrading
-from 0.2.0 carries its list over once, with each workspace file replaced by its repo folder, plus `~/github` if it
-exists. The design, with the reasons behind each rule: [docs/notes/101-gannet.md](docs/notes/101-gannet.md).
+The panel on top lists the directories you keep checkouts in on this machine, such as `/git` and `~/github`
+locally or `~/` on a remote machine. **Add folder…** adds a directory (not a repo itself); hovering a directory
+shows **Reveal in File Manager** and **Remove from List**, which forgets it and deletes nothing. A directory that
+is gone shows **Missing**. Each machine has its own list, and every listed directory is scanned on start for
+clones. Upgrading from 0.2.0 carries its list over once, with each workspace file replaced by its repo folder,
+plus `~/github` if it exists. The design, with the reasons behind each rule:
+[docs/notes/101-gannet.md](docs/notes/101-gannet.md).
 
 ## Checking out
 
