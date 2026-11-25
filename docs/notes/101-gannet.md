@@ -305,16 +305,16 @@ GANNET                               [+ account] [⟳]
  ───────────────────────────────────────────────
  ▸ (org) bpmn2               via seanahn
  ▾ (org) c3-e                via c3-sahn
-   ▸ Recent
-   ▾ All repos               312
-     ▸ (cat) c3nexus         private · ~
-         ...
+   ▸ (cat) c3reliability     private               (recent repos first)
+   ▸ (cat) c3nexus           private · ~
+   ▸ All repos               312
  ▾ (person) seanahn
-   ▾ Recent
-     ▾ (green cat) perch     /git · ~/github
-       ▾ /git/perch
-         ▸ src                                   (folders: arrow only)
-           (file) README.md                      (files: icon in the arrow's column)
+   ▾ (green cat) perch       /git · ~/github       (two checkouts: one row each)
+     ▾ /git/perch
+       ▸ src                                       (folders: arrow only)
+         (file) README.md                          (files: icon in the arrow's column)
+     ▸ ~/github/perch
+   ▸ All repos               143
 ```
 
 ### What it is
@@ -327,8 +327,8 @@ GANNET                               [+ account] [⟳]
   row at the end. A thin line separates it from the owners. *(Sean: "a little configuration panel on top")* The
   rules are 0.3.0's: a git repo is refused, removing deletes nothing, the list is per machine. *(builder's calls on
   the layout)*
-- **Below, the owners are the top-level rows,** with everything under them as 0.3.0's tree: Recent, All repos,
-  repos, checkouts, folders and files, the same labels, descriptions, tooltips and expanded-at-start rules. *(Sean)*
+- **Below, the owners are the top-level rows,** with everything under them as 0.3.0's tree: an owner's
+  recent repos, then All repos; under a repo its checkouts, folders and files; the same labels, descriptions, tooltips and expanded-at-start rules. *(Sean)*
 - **Icons:**
   - folders have none, only the expand arrow; *(Sean, as in 0.3.0)*
   - every file has the same generic file icon, in the arrow's column, so files line up under the folders'
@@ -359,6 +359,9 @@ GANNET                               [+ account] [⟳]
 - **Refreshing** (⟳, a checkout, a workspace or account change) redraws from the top and keeps what was expanded;
   only ⟳ reads repo lists from GitHub again. *(as 0.3.0)*
 - No search box, no drag and drop, no multi-select. *(non-goals: the tree had none)*
+- A click or expand that names a row the extension no longer knows (it arrived just after a refresh) is ignored
+  quietly; the page asks for each row's children at most once per redraw. Rows are 22 px high and indent 8 px a
+  level, as VS Code's lists. The view's name is empty, so its title is just **GANNET**. *(builder's calls)*
 
 ### How it is made
 
