@@ -41,6 +41,7 @@ const repo = (fullName) => ({ fullName, owner: fullName.split('/')[0], name: ful
 
 // Local repos: scan, forget missing, clean partials, ~ expansion
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gannet-state-'));
+(async () => {
 try {
   const home = path.join(tmp, 'home');
   const folder = path.join(home, 'github');
@@ -59,28 +60,60 @@ try {
 
   const memento = makeMemento();
   const local = createLocalRepos({ memento, home });
+  const paths = (n) => local.checkoutsOf(n).map((c) => c.path);
   local.remember('seanahn/roost', { path: path.join(folder, 'roost-deleted'), login: 'seanahn', byGannet: true });
   local.remember('seanahn/kept', { path: path.join(folder, 'perch'), login: 'seanahn', byGannet: true });
   local.scan('~/github');
-  assert.deepStrictEqual(local.get('seanahn/perch'), { path: path.join(folder, 'perch'), login: null, byGannet: false });
-  assert.strictEqual(local.get('x/y'), undefined, 'not a github origin');
+  assert.deepStrictEqual(local.checkoutsOf('seanahn/perch'), [{ path: path.join(folder, 'perch'), login: null, byGannet: false }]);
+  assert.deepStrictEqual(local.checkoutsOf('x/y'), [], 'not a github origin');
+  assert.deepStrictEqual(local.checkoutsOf('seanahn/roost'), [], 'a checkout gone from disk is not listed');
   local.forgetMissing();
-  assert.strictEqual(local.get('seanahn/roost'), undefined, 'deleted from disk: forgotten');
-  assert.ok(local.get('seanahn/kept'), 'still on disk: kept');
+  assert.ok(!('seanahn/roost' in memento.get('gannet.local')), 'deleted from disk: forgotten');
+  assert.strictEqual(local.checkoutsOf('seanahn/kept').length, 1, 'still on disk: kept');
   local.remember('seanahn/perch', { path: path.join(folder, 'perch'), login: 'seanahn', byGannet: true });
   local.scan(folder);
-  assert.strictEqual(local.get('seanahn/perch').login, 'seanahn', 'scan does not overwrite what is known');
+  assert.deepStrictEqual(local.checkoutsOf('seanahn/perch').map((c) => c.login), ['seanahn'], 'scan does not overwrite or repeat what is known');
   local.cleanPartials('~/github');
   assert.ok(!fs.existsSync(path.join(folder, 'half.gannet-partial-999999999')));
   assert.ok(!fs.existsSync(path.join(folder, 'old.gannet-partial')));
   assert.ok(fs.existsSync(path.join(folder, 'busy.gannet-partial-' + process.pid)), 'another window is still cloning');
   // GitHub names ignore case (review fix)
-  assert.strictEqual(local.get('SeanAhn/Perch').path, path.join(folder, 'perch'));
+  assert.deepStrictEqual(paths('SeanAhn/Perch'), [path.join(folder, 'perch')]);
   assert.ok(fs.existsSync(path.join(folder, 'notes')));
-  assert.ok(local.all() instanceof Map && local.all().has('seanahn/perch'));
-  assert.deepStrictEqual(memento.get('gannet.local')['seanahn/perch'].login, 'seanahn', 'stored in the memento');
+  assert.ok(local.all() instanceof Map && Array.isArray(local.all().get('seanahn/perch')));
+  assert.strictEqual(memento.get('gannet.local')['seanahn/perch'][0].login, 'seanahn', 'stored in the memento');
   local.scan(path.join(tmp, 'nowhere'));   // a missing folder scans as empty
   local.cleanPartials(path.join(tmp, 'nowhere'));
+
+  // 0.3.0: several checkouts of one repo
+  {
+    const A = path.join(tmp, 'a', 'r'), B = path.join(tmp, 'b', 'r');
+    fs.mkdirSync(A, { recursive: true }); fs.mkdirSync(B, { recursive: true });
+    const m = makeMemento();
+    const l = createLocalRepos({ memento: m, home });
+    await l.remember('o/r', { path: A });
+    await l.remember('o/r', { path: B });
+    assert.deepStrictEqual(l.checkoutsOf('O/R').map((c) => c.path), [A, B]);
+    await l.remember('o/r', { path: A, login: 'x', byGannet: true });
+    assert.deepStrictEqual(l.checkoutsOf('o/r'), [{ path: A, login: 'x', byGannet: true }, { path: B, login: null, byGannet: false }], 'the same path is replaced in place');
+    // Review Focus 1: one of two deleted from disk
+    fs.rmSync(B, { recursive: true });
+    assert.deepStrictEqual(l.checkoutsOf('o/r').map((c) => c.path), [A]);
+    await l.forgetMissing();
+    assert.deepStrictEqual(m.get('gannet.local')['o/r'].map((c) => c.path), [A]);
+    // two clones of one repo in a folder: both found, once
+    const d = path.join(tmp, 'two');
+    mkRepo(path.join(d, 'r'), 'https://github.com/o/s.git');
+    mkRepo(path.join(d, 'r-2'), 'git@github.com:o/s.git');
+    await l.scan(d); await l.scan(d);
+    assert.deepStrictEqual(l.checkoutsOf('o/s').map((c) => c.path), [path.join(d, 'r'), path.join(d, 'r-2')]);
+    // the single entry 0.1.0 and 0.2.0 stored
+    const old = createLocalRepos({ memento: makeMemento({ 'gannet.local': { 'o/r': { path: A, login: 'x', byGannet: true } } }), home });
+    assert.deepStrictEqual(old.checkoutsOf('o/r'), [{ path: A, login: 'x', byGannet: true }]);
+    await old.remember('o/r', { path: path.join(d, 'r') });
+    assert.strictEqual(old.checkoutsOf('o/r').length, 2, 'an old entry takes a second checkout');
+  }
 } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 
 console.log('STATE OK');
+})().catch((e) => { console.error(e); process.exit(1); });

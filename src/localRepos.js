@@ -1,6 +1,6 @@
 'use strict';
 // Where repos are checked out on this machine: remembered when Gannet clones them, and found by their origin URL
-// when they already sit in the checkout folder. Kept in global state, which is per machine.
+// when they already sit in a workspace. A repo can be checked out more than once. Kept in machine.json.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -39,15 +39,32 @@ const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { retu
 const children = (dir) => { try { return fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch { return []; } };
 
 function createLocalRepos({ memento, home = os.homedir() }) {
-  const load = () => memento.get(KEY, {}) || {};
+  // { key: [checkout, …] }; 0.1.0 and 0.2.0 stored one checkout per key, read as a list of one
+  const load = () => {
+    const all = memento.get(KEY, {}) || {};
+    for (const k of Object.keys(all)) if (!Array.isArray(all[k])) all[k] = all[k] ? [all[k]] : [];
+    return all;
+  };
   const save = (all) => memento.update(KEY, all);
+  const entry = (e) => ({ path: e.path, login: e.login ?? null, byGannet: !!e.byGannet });
   return {
-    get: (fullName) => load()[keyOf(fullName)],
+    /** This repo's checkouts still on disk, in the order remembered. */
+    checkoutsOf: (fullName) => (load()[keyOf(fullName)] || []).filter((c) => isDir(c.path)),
     all: () => new Map(Object.entries(load())),
-    remember(fullName, entry) { const all = load(); all[keyOf(fullName)] = { path: entry.path, login: entry.login ?? null, byGannet: !!entry.byGannet }; return save(all); },
+    remember(fullName, e) {
+      const all = load();
+      const list = all[keyOf(fullName)] || [];
+      const i = list.findIndex((c) => c.path === e.path);
+      if (i >= 0) list[i] = entry(e); else list.push(entry(e));
+      all[keyOf(fullName)] = list;
+      return save(all);
+    },
     forgetMissing() {
       const all = load();
-      for (const [k, v] of Object.entries(all)) if (!isDir(v.path)) delete all[k];
+      for (const [k, list] of Object.entries(all)) {
+        const kept = list.filter((c) => isDir(c.path));
+        if (kept.length) all[k] = kept; else delete all[k];
+      }
       return save(all);
     },
     scan(folder) {
@@ -55,8 +72,11 @@ function createLocalRepos({ memento, home = os.homedir() }) {
       const all = load();
       for (const name of children(dir)) {
         if (PARTIAL_RE.test(name)) continue;
-        const full = parseOrigin(originOf(path.join(dir, name)));
-        if (full && !all[keyOf(full)]) all[keyOf(full)] = { path: path.join(dir, name), login: null, byGannet: false };
+        const p = path.join(dir, name);
+        const full = parseOrigin(originOf(p));
+        if (!full) continue;
+        const list = all[keyOf(full)] || [];
+        if (!list.some((c) => c.path === p)) all[keyOf(full)] = [...list, entry({ path: p })];
       }
       return save(all);
     },
