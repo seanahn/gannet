@@ -48,10 +48,12 @@ class GannetSidebar {
     if (!m || typeof m !== 'object') return;
     const cmd = (id, ...args) => this.vscode.commands.executeCommand(id, ...args);
     switch (m.type) {
-      case 'ready':
+      case 'ready': {
         this.refreshWorkspaces();
-        this.post({ type: 'rows', parent: null, rows: await this.store.root() });
+        const rows = await this.store.root();
+        if (rows) this.post({ type: 'rows', parent: null, rows });
         return;
+      }
       case 'expand': {
         const rows = await this.store.children(m.id);
         if (rows) this.post({ type: 'rows', parent: m.id, rows });

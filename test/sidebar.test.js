@@ -73,6 +73,28 @@ const { GannetSidebar } = require('../src/sidebar.js');
     fx.tree.redraw();
     assert.deepStrictEqual(view._posted.at(-1), { type: 'reset' });
     assert.strictEqual(sidebar.resolve({ nodeId: file.id }), undefined);
+
+    // Final review: an answer that arrives after a redraw is dropped, not posted or remembered
+    {
+      let fire, hold;
+      const A = { kind: 'info', label: 'a' }, old = { kind: 'info', label: 'old' };
+      const slow = {
+        onDidChangeTreeData: (f) => { fire = f; },
+        getTreeItem: (n) => ({ label: n.label, collapsibleState: n === A ? 1 : 0 }),
+        getChildren: (n) => (n ? new Promise((r) => { hold = r; }) : Promise.resolve([A])),
+      };
+      const sb = new GannetSidebar({ vscode, tree: slow, workspaces: fx.workspaces, home: fx.home, extensionUri: vscode.Uri.file('/ext') });
+      vscode.window.registerWebviewViewProvider('gannet.slow', sb);
+      const v = vscode._resolveView('gannet.slow');
+      await v._send({ type: 'ready' });
+      const aId = v._posted.at(-1).rows[0].id;
+      const pending = v._send({ type: 'expand', id: aId });
+      fire();                                   // the tree changed while A's children were on their way
+      hold([old]);
+      await pending;
+      assert.deepStrictEqual(v._posted.at(-1), { type: 'reset' }, 'the late answer is not posted');
+      assert.strictEqual(sb.resolve({ nodeId: aId + '/i:old' }), undefined, 'nor remembered');
+    }
     console.log('SIDEBAR OK');
   } finally { fx.cleanup(); }
 })().catch((e) => { console.error(e); process.exit(1); });

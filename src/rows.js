@@ -44,8 +44,9 @@ function toRow(item, id) {
   };
 }
 
+/** Rows by id for one drawing of the tree. An answer that started before clear() is dropped: null, not stale rows. */
 function createRowStore(tree) {
-  let nodes = new Map(), items = new Map();
+  let nodes = new Map(), items = new Map(), gen = 0;
   const rows = (parentId, list) => childIds(parentId, list).map((id, i) => {
     const item = tree.getTreeItem(list[i]);
     nodes.set(id, list[i]);
@@ -53,15 +54,19 @@ function createRowStore(tree) {
     return toRow(item, id);
   });
   return {
-    async root() { return rows(null, await tree.getChildren()); },
+    async root() {
+      const g = gen, list = await tree.getChildren();
+      return g === gen ? rows(null, list) : null;
+    },
     async children(id) {
       const node = nodes.get(id);
       if (!node) return null;
-      return rows(id, await tree.getChildren(node));
+      const g = gen, list = await tree.getChildren(node);
+      return g === gen ? rows(id, list) : null;
     },
     node: (id) => nodes.get(id),
     item: (id) => items.get(id),
-    clear() { nodes = new Map(); items = new Map(); },
+    clear() { nodes = new Map(); items = new Map(); gen++; },
   };
 }
 
