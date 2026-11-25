@@ -302,6 +302,15 @@ Rulings settled while planning the build, all builder's calls:
   on GitHub** and leaves Recent. Tree items carry no ids, since a repo shows under both Recent and All repos.
 - **Sign in** on a signed-out VS Code account runs VS Code's account picker. **Reveal in Explorer** reveals the
   folder in VS Code's explorer when it is a workspace folder, and in the system's file manager otherwise.
+- Workspaces (planned for 0.2.0):
+  - Workspace files are edited with `jsonc-parser` (`modify` + `applyEdits`), Gannet's one runtime dependency,
+    so comments, trailing commas and other settings survive. A folder already listed, in either absolute or
+    relative form, is not added twice; `uri` entries (remote folders) are ignored.
+  - A workspace file's repo folder is the parent folder shared by the most of its folders, with ties going to the
+    first such parent in the file. If there are no folders, or the file can't be read, it's the file's own folder.
+  - This window's workspace is added to the stored list on activation, so other windows on the machine see it.
+  - **Push as** on a repo in the Workspaces view asks which account first, since a folder there has none.
+  - **New workspace…** writes `{"folders": [], "settings": {}}`, and refuses a name that already exists.
 - Known gaps, left for later: the All repos count does not show; **More files** links break for branch names
   with `/`; mixed-case logins may not reopen `gannet:` editors after a restart; partial folders outside the
   default checkout folder and the listed workspaces' folders are not cleaned; logins are not validated before being written into git config.
