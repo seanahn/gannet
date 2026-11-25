@@ -102,5 +102,15 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
     const both = await kindOf(403, { 'X-GitHub-SSO': 'required; url=https://github.com/orgs/y/sso', 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1700000000' });
     assert.strictEqual(both.kind, 'sso', 'SSO wins over rate');
   }
+  // review fixes: an empty repo's root is a 404 "This repository is empty."; a submodule is listed as a file
+  {
+    const gh = createClient({ fetch: fakeFetch(() => response(404, { message: 'This repository is empty.' })), token: async () => TOKEN });
+    assert.strictEqual((await rejects(gh.listDir('o', 'r', ''))).kind, 'empty');
+    const gone = createClient({ fetch: fakeFetch(() => response(404, { message: 'Not Found' })), token: async () => TOKEN });
+    assert.strictEqual((await rejects(gone.listDir('o', 'r', ''))).kind, 'notFound');
+    const sub = createClient({ fetch: fakeFetch(() => response(200, [{ name: 'abseil-cpp', path: 'third_party/abseil-cpp', type: 'file', size: 0, download_url: null, html_url: 'https://github.com/abseil/abseil-cpp/tree/5650e9c', git_url: 'https://api.github.com/repos/abseil/abseil-cpp/git/trees/5650e9c' }, { name: 'a.c', path: 'a.c', type: 'file', size: 2, download_url: 'https://raw.githubusercontent.com/o/r/main/a.c', html_url: 'https://github.com/o/r/blob/main/a.c' }])), token: async () => TOKEN });
+    const { entries } = await sub.listDir('o', 'r', 'third_party');
+    assert.deepStrictEqual(entries.map((e) => [e.name, e.type]), [['a.c', 'file'], ['abseil-cpp', 'submodule']]);
+  }
   console.log('GITHUB OK');
 })().catch((e) => { console.error(e); process.exit(1); });

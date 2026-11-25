@@ -105,7 +105,11 @@ class GannetTree {
   errorNode(e, node) {
     const account = node && node.account;
     const n = { kind: 'error', error: e, account };
-    if (e && e.kind === 'auth') { n.label = 'Signed out'; return n; }
+    if (e && e.kind === 'auth') {
+      if (account && this.accounts.forget) this.accounts.forget(account.login);   // read afresh next time
+      n.label = 'Signed out';
+      return n;
+    }
     if (e && e.kind === 'sso') { n.label = `${(node.repo && node.repo.owner) || 'An organization'} needs SSO authorization`; return n; }
     if (e && e.kind === 'rate') { const t = e.retryAt; n.label = t ? `Rate limited — try again at ${pad(t.getHours())}:${pad(t.getMinutes())}` : 'Rate limited — try again later'; return n; }
     n.label = (e && e.message) || String(e);

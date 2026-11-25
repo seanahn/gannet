@@ -149,6 +149,14 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gannet-tree-'));
     repoLists.seanahn.pushed = [R('seanahn/perch')];
     tree.refresh();
     assert.deepStrictEqual(await labels((await tree.getChildren(sean))[0]), ['seanahn/perch']);
+    // review fix: a refused token is dropped, so after gh auth login and refresh the account works again
+    {
+      const forgotten = [];
+      const t2 = new GannetTree({ vscode, accounts: { list: async () => accountList, forget: (l) => forgotten.push(l) }, clientFor: () => ({ listRepos: async () => { throw new GitHubError('auth', 401, 'Bad credentials'); } }), recent, local });
+      const [acct] = await t2.getChildren();
+      await t2.getChildren((await t2.getChildren(acct))[0]);
+      assert.deepStrictEqual(forgotten, ['c3-sahn']);
+    }
     console.log('TREE OK');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 })().catch((e) => { console.error(e); fs.rmSync(tmp, { recursive: true, force: true }); process.exit(1); });

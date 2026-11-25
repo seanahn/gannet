@@ -35,7 +35,7 @@ function createAccounts({ vscode, run = runProcess, hidden = () => [] }) {
     try { res = await run('gh', ['auth', 'status', '--hostname', HOST]); } catch { return []; }   // gh not installed
     const text = `${res.stdout}\n${res.stderr}`;
     const out = [];
-    for (const m of text.matchAll(/Logged in to github\.com account (\S+)/g)) if (!out.includes(m[1])) out.push(m[1]);
+    for (const m of text.matchAll(/(?:Logged in to|Failed to log in to) github\.com account (\S+)/g)) if (!out.includes(m[1])) out.push(m[1]);
     return out;
   }
 
@@ -85,6 +85,8 @@ function createAccounts({ vscode, run = runProcess, hidden = () => [] }) {
   return {
     list, token, addVsCodeAccount,
     forget: (login) => { tokens.delete(login); },
+    forgetAll: () => { tokens.clear(); },
+    cached: (login) => tokens.has(login),
     sourceOf: (login) => sources.get(login),
     onDidChange: changed.event,
   };

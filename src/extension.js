@@ -17,7 +17,9 @@ let state = null;
 const settings = () => vscode.workspace.getConfiguration('gannet');
 const checkoutFolder = () => settings().get('checkoutFolder', '~/github') || '~/github';
 
-async function activateWith(context, { run = runProcess, fetch = globalThis.fetch, home = os.homedir() } = {}) {
+const PENDING = 'gannet.pending';
+
+async function activateWith(context, { run = runProcess, fetch = globalThis.fetch, home = os.homedir(), startServer = startTokenServer } = {}) {
   const store = context.globalStorageUri.fsPath;
   const accounts = createAccounts({ vscode, run, hidden: () => settings().get('hiddenAccounts', []) });
   const clients = new Map();
@@ -33,15 +35,24 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   await local.forgetMissing();
   await local.scan(checkoutFolder());
 
+  // Pushing as a VS Code account needs this window to serve tokens, and a shim git can run. Without them (or on
+  // Windows, where the helper cannot find the named pipe) such repos are checked out without a push account.
   let shim = '';
   let server = null;
-  try {
-    server = await startTokenServer({ dir: store, token: (login) => accounts.token(login) });
-    shim = writeShim({ dir: store, execPath: process.execPath, script: path.join(context.extensionPath, 'bin', 'gannet-credential.js'), socketDir: socketDir(store) });
-  } catch (e) {
-    vscode.window.showWarningMessage(`Gannet: pushing as a VS Code account will not work in this window (${e.message}).`);
+  if (process.platform !== 'win32') {
+    try {
+      server = await startServer({ dir: store, token: (login) => accounts.token(login) });
+      shim = writeShim({ dir: store, execPath: process.execPath, script: path.join(context.extensionPath, 'bin', 'gannet-credential.js'), socketDir: socketDir(store) });
+    } catch (e) {
+      shim = '';
+    }
   }
-  const helperCommand = (account) => ((account.source || accounts.sourceOf(account.login)) === 'vscode' ? `!"${shim}" ${account.login}` : ghHelper(account.login));
+  const helperCommand = (account) => {
+    if ((account.source || accounts.sourceOf(account.login)) !== 'vscode') return ghHelper(account.login);
+    if (shim) return `!"${shim}" ${account.login}`;
+    vscode.window.showWarningMessage(`Gannet cannot push as ${account.login} from this window; the repo uses your usual git sign-in. Add the account to gh to push as it.`);
+    return '';
+  };
   const checkout = createCheckout({ run, local, accounts, helperCommand, home });
 
   const tree = new GannetTree({ vscode, accounts, clientFor, recent, local });
@@ -64,9 +75,16 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     return r && r[0] ? r[0].fsPath : undefined;
   };
 
+  // checkouts not yet in the workspace, kept so one cut off by an extension restart is resumed on the next start
+  const pending = () => context.globalState.get(PENDING, []) || [];
+  const setPending = (list) => context.globalState.update(PENDING, list);
+  const samePending = (a, b) => a.repo.fullName === b.repo.fullName && a.folder === b.folder;
+
   async function doCheckout(node, folder) {
     if (!node || !node.repo) return;
     const { repo, account } = node;
+    const job = { repo, account, folder };
+    await setPending([...pending().filter((j) => !samePending(j, job)), job]);
     try {
       const res = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: `Checking out ${repo.fullName}`, cancellable: true },
         (progress, token) => checkout.checkout({ repo, account, folder, token, onProgress: (line) => progress.report({ message: line }), ask: () => pickFolder(`${repo.name} is taken in ${folder} — pick another folder`) }));
@@ -77,12 +95,14 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
       if (e && e.message === 'cancelled') return;
       if (e && e.kind === 'auth') accounts.forget(account.login);
       vscode.window.showErrorMessage(`Gannet: could not check out ${repo.fullName}: ${e && e.message ? e.message : e}`);
+    } finally {
+      await setPending(pending().filter((j) => !samePending(j, job)));
     }
   }
 
   const localPath = (node) => { const l = node && node.repo && local.get(node.repo.fullName); return l && l.path; };
   const commands = {
-    'gannet.refresh': () => tree.refresh(),
+    'gannet.refresh': () => { accounts.forgetAll(); tree.refresh(); },
     'gannet.addAccount': async () => { const a = await accounts.addVsCodeAccount(); if (a) tree.refresh(); },
     'gannet.signIn': async () => { await accounts.addVsCodeAccount(); tree.refresh(); },
     'gannet.hideAccount': async (node) => {
@@ -132,6 +152,9 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     }),
     { dispose: () => { if (server) server.close(); } },
   );
+
+  // resume checkouts an extension restart cut off, one after another, without holding up activation
+  state.resumed = (async () => { for (const job of pending()) await doCheckout({ kind: 'repo', repo: job.repo, account: job.account }, job.folder); })();
 }
 
 function activate(context) { return activateWith(context); }

@@ -74,5 +74,16 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
     assert.strictEqual(changed, 1);
     assert.deepStrictEqual(await accounts.list(), [{ login: 'carol', source: 'vscode' }]);
   }
+  // review fixes: a gh account whose token gh cannot use is still listed (it shows signed out); forgetAll
+  {
+    const status = 'github.com\n  X Failed to log in to github.com account c3-sahn (keyring)\n  - Active account: true\n  - The token in keyring is invalid.\n  ✓ Logged in to github.com account seanahn (keyring)\n';
+    const run = fakeRun({ 'gh auth status --hostname github.com': { code: 1, stdout: status }, 'gh auth token --hostname github.com --user seanahn': { stdout: 't\n' } });
+    const accounts = createAccounts({ vscode: fakeVscode(), run, hidden: () => [] });
+    assert.deepStrictEqual((await accounts.list()).map((a) => a.login), ['c3-sahn', 'seanahn']);
+    await accounts.token('seanahn');
+    accounts.forgetAll();
+    await accounts.token('seanahn');
+    assert.strictEqual(run.calls.filter((c) => c.startsWith('gh auth token')).length, 2);
+  }
   console.log('ACCOUNTS OK');
 })().catch((e) => { console.error(e); process.exit(1); });

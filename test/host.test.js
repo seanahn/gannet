@@ -97,7 +97,33 @@ const manifest = require('../package.json');
     assert.strictEqual(opened.args[0].scheme, 'gannet');
     assert.strictEqual(opened.args[0].path, '/seanahn/perch/src/a.js');
 
+    // review fix: refresh reads gh's tokens afresh (after gh auth login, say)
+    {
+      const st = ext._state();
+      await st.accounts.token('seanahn');
+      assert.strictEqual(st.accounts.cached('seanahn'), true);
+      await vscode.commands.executeCommand('gannet.refresh');
+      assert.strictEqual(st.accounts.cached('seanahn'), false, 'refresh drops cached tokens');
+    }
     await ext.deactivate();
+
+    // review fix: a checkout cut off by an extension restart is resumed on the next start;
+    // and with no helper for VS Code accounts, no broken push setting is written
+    {
+      const context2 = { globalState: makeMemento({ 'gannet.pending': [{ repo: { ...repo, fullName: 'seanahn/later', name: 'later' }, account: { login: 'vsuser', source: 'vscode' }, folder: path.join(tmp, 'resumed') }] }), subscriptions: [], globalStorageUri: Uri.file(path.join(tmp, 'store2')), extensionPath: path.join(__dirname, '..') };
+      vscode.accounts.push({ id: 'v', label: 'vsuser' });
+      vscode.tokens.vsuser = 'vs-token';
+      await ext.activateWith(context2, { run, fetch, home, startServer: async () => { throw new Error('no sockets here'); } });
+      await ext._state().resumed;
+      const later = path.join(tmp, 'resumed', 'later');
+      assert.ok(fs.existsSync(path.join(later, 'a.txt')), 'resumed');
+      assert.deepStrictEqual(context2.globalState.get('gannet.pending'), [], 'and no longer pending');
+      const helpers = (() => { try { return sh('git config --local --get-all credential.https://github.com.helper', later); } catch { return ''; } })();
+      assert.strictEqual(helpers, '', 'no helper written when it cannot work');
+      assert.strictEqual(ext._state().local.get('seanahn/later').login, null, 'so the tree offers Push as later');
+      assert.ok(rec.messages.some((m) => /cannot push as vsuser/.test(m.msg)), JSON.stringify(rec.messages.map((m) => m.msg)));
+      await ext.deactivate();
+    }
     console.log('HOST OK');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 })().catch((e) => { console.error(e); fs.rmSync(tmp, { recursive: true, force: true }); process.exit(1); });

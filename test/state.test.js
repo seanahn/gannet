@@ -51,8 +51,11 @@ try {
   mkRepo(path.join(folder, 'perch'), 'git@github.com:seanahn/perch.git');
   fs.mkdirSync(path.join(folder, 'notes'), { recursive: true });   // not a git repo
   mkRepo(path.join(folder, 'other'), 'https://gitlab.com/x/y.git');
-  fs.mkdirSync(path.join(folder, 'half.gannet-partial'), { recursive: true });
-  fs.writeFileSync(path.join(folder, 'half.gannet-partial', 'f'), 'x');
+  // partials carry the pid of the window cloning them: a dead one's is removed, a live one's is left alone (review fix)
+  fs.mkdirSync(path.join(folder, 'half.gannet-partial-999999999'), { recursive: true });
+  fs.writeFileSync(path.join(folder, 'half.gannet-partial-999999999', 'f'), 'x');
+  fs.mkdirSync(path.join(folder, 'busy.gannet-partial-' + process.pid), { recursive: true });
+  fs.mkdirSync(path.join(folder, 'old.gannet-partial'), { recursive: true });
 
   const memento = makeMemento();
   const local = createLocalRepos({ memento, home });
@@ -68,7 +71,11 @@ try {
   local.scan(folder);
   assert.strictEqual(local.get('seanahn/perch').login, 'seanahn', 'scan does not overwrite what is known');
   local.cleanPartials('~/github');
-  assert.ok(!fs.existsSync(path.join(folder, 'half.gannet-partial')));
+  assert.ok(!fs.existsSync(path.join(folder, 'half.gannet-partial-999999999')));
+  assert.ok(!fs.existsSync(path.join(folder, 'old.gannet-partial')));
+  assert.ok(fs.existsSync(path.join(folder, 'busy.gannet-partial-' + process.pid)), 'another window is still cloning');
+  // GitHub names ignore case (review fix)
+  assert.strictEqual(local.get('SeanAhn/Perch').path, path.join(folder, 'perch'));
   assert.ok(fs.existsSync(path.join(folder, 'notes')));
   assert.ok(local.all() instanceof Map && local.all().has('seanahn/perch'));
   assert.deepStrictEqual(memento.get('gannet.local')['seanahn/perch'].login, 'seanahn', 'stored in the memento');

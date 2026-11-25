@@ -27,6 +27,14 @@ function originOf(dir) {
   return m ? m[1] : '';
 }
 
+const keyOf = (fullName) => String(fullName).toLowerCase();   // GitHub names ignore case
+/** A partial clone's folder: tied to this window's process, so another window never removes one still in progress. */
+const partialOf = (target) => `${target}${PARTIAL}-${process.pid}`;
+const PARTIAL_RE = /\.gannet-partial(?:-(\d+))?$/;
+function alive(pid) {
+  try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; }
+}
+
 const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 const children = (dir) => { try { return fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch { return []; } };
 
@@ -34,9 +42,9 @@ function createLocalRepos({ memento, home = os.homedir() }) {
   const load = () => memento.get(KEY, {}) || {};
   const save = (all) => memento.update(KEY, all);
   return {
-    get: (fullName) => load()[fullName],
+    get: (fullName) => load()[keyOf(fullName)],
     all: () => new Map(Object.entries(load())),
-    remember(fullName, entry) { const all = load(); all[fullName] = { path: entry.path, login: entry.login ?? null, byGannet: !!entry.byGannet }; return save(all); },
+    remember(fullName, entry) { const all = load(); all[keyOf(fullName)] = { path: entry.path, login: entry.login ?? null, byGannet: !!entry.byGannet }; return save(all); },
     forgetMissing() {
       const all = load();
       for (const [k, v] of Object.entries(all)) if (!isDir(v.path)) delete all[k];
@@ -46,17 +54,20 @@ function createLocalRepos({ memento, home = os.homedir() }) {
       const dir = expandHome(folder, home);
       const all = load();
       for (const name of children(dir)) {
-        if (name.endsWith(PARTIAL)) continue;
+        if (PARTIAL_RE.test(name)) continue;
         const full = parseOrigin(originOf(path.join(dir, name)));
-        if (full && !all[full]) all[full] = { path: path.join(dir, name), login: null, byGannet: false };
+        if (full && !all[keyOf(full)]) all[keyOf(full)] = { path: path.join(dir, name), login: null, byGannet: false };
       }
       return save(all);
     },
     cleanPartials(folder) {
       const dir = expandHome(folder, home);
-      for (const name of children(dir)) if (name.endsWith(PARTIAL)) fs.rmSync(path.join(dir, name), { recursive: true, force: true });
+      for (const name of children(dir)) {
+        const m = PARTIAL_RE.exec(name);
+        if (m && !(m[1] && alive(Number(m[1])))) fs.rmSync(path.join(dir, name), { recursive: true, force: true });
+      }
     },
   };
 }
 
-module.exports = { createLocalRepos, parseOrigin, originOf, expandHome, isDir, PARTIAL };
+module.exports = { createLocalRepos, parseOrigin, originOf, expandHome, isDir, PARTIAL, partialOf };

@@ -36,6 +36,7 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
       const origin = (map) => (p) => map[p] || '';
       assert.deepStrictEqual(chooseTarget(path.join(tmp, 'empty'), repo, { isDir, originOf: origin({}) }), { path: path.join(tmp, 'empty', 'perch'), existing: false });
       assert.deepStrictEqual(chooseTarget(folder, repo, { isDir, originOf: origin({ [path.join(folder, 'perch')]: 'git@github.com:seanahn/perch.git' }) }), { path: path.join(folder, 'perch'), existing: true });
+      assert.deepStrictEqual(chooseTarget(folder, repo, { isDir, originOf: origin({ [path.join(folder, 'perch')]: 'git@github.com:SeanAhn/Perch.git' }) }), { path: path.join(folder, 'perch'), existing: true }, 'GitHub names ignore case');
       assert.deepStrictEqual(chooseTarget(folder, repo, { isDir, originOf: origin({ [path.join(folder, 'perch')]: 'git@github.com:other/perch.git' }) }), { path: path.join(folder, 'seanahn-perch'), existing: false });
       fs.mkdirSync(path.join(folder, 'seanahn-perch'));
       assert.deepStrictEqual(chooseTarget(folder, repo, { isDir, originOf: origin({}) }), { ask: true });
@@ -56,7 +57,7 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
       const co = createCheckout({ run: runProcess, spawn, local, accounts, home, helperCommand: (a) => 'HELPER-' + a.login });
       return { co, local };
     };
-    const recordSpawn = () => { const calls = []; const f = (cmd, args, o) => { calls.push(args); return childProcess.spawn(cmd, args, o); }; f.calls = calls; return f; };
+    const recordSpawn = () => { const calls = [], envs = []; const f = (cmd, args, o) => { calls.push(args); envs.push(o.env); return childProcess.spawn(cmd, args, o); }; f.calls = calls; f.envs = envs; return f; };
 
     // a real clone: into the folder (created under ~), renamed from the partial, push settings written, remembered
     {
@@ -66,7 +67,7 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
       const target = path.join(home, 'github', 'perch');
       assert.deepStrictEqual(res, { path: target, existing: false });
       assert.ok(fs.existsSync(path.join(target, 'a.txt')));
-      assert.ok(!fs.existsSync(target + '.gannet-partial'));
+      assert.ok(!fs.readdirSync(path.dirname(target)).some((n) => n.includes('gannet-partial')));
       const config = fs.readFileSync(path.join(target, '.git', 'config'), 'utf8');
       assert.ok(!config.includes(TOKEN) && !config.includes(B64), 'no token in .git/config');
       assert.strictEqual(originOf(target), bare, 'remote is the plain URL');
@@ -74,9 +75,22 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
       assert.deepStrictEqual(helpers.slice(0, 2), ['', 'HELPER-seanahn']);
       assert.strictEqual(sh('git config --local credential.https://github.com.username', target).trim(), 'seanahn');
       assert.deepStrictEqual(local.get('seanahn/perch'), { path: target, login: 'seanahn', byGannet: true });
+      // the sign-in travels in git's environment, scoped to github.com, never on the command line (review fix)
       const args = spawn.calls[0];
-      assert.ok(args.includes('http.extraHeader=Authorization: Basic ' + B64), args.join(' '));
-      assert.strictEqual(args.at(-1), target + '.gannet-partial');
+      assert.ok(!args.join(' ').includes(B64) && !args.join(' ').includes(TOKEN), args.join(' '));
+      const env = spawn.envs[0];
+      const n = Number(env.GIT_CONFIG_COUNT);
+      const pairs = Array.from({ length: n }, (_, i) => [env['GIT_CONFIG_KEY_' + i], env['GIT_CONFIG_VALUE_' + i]]);
+      assert.ok(pairs.some(([k, v]) => k === 'http.https://github.com/.extraHeader' && v === 'Authorization: Basic ' + B64), JSON.stringify(pairs.map(([k]) => k)));
+      assert.ok(pairs.some(([k, v]) => k === 'credential.helper' && v === ''), 'no fallback to the machine\'s own sign-in');
+      assert.strictEqual(args.at(-1), target + '.gannet-partial-' + process.pid);
+
+      // Push as twice over: the second run replaces the settings instead of failing (review fix)
+      const { configurePush } = require('../src/checkout.js');
+      await configurePush(runProcess, target, 'c3-sahn', 'HELPER-2');
+      assert.deepStrictEqual(sh('git config --local --get-all credential.https://github.com.helper', target).split('\n').slice(0, 2), ['', 'HELPER-2']);
+      assert.strictEqual(sh('git config --local credential.https://github.com.username', target).trim(), 'c3-sahn');
+      await configurePush(runProcess, target, 'seanahn', 'HELPER-seanahn');
 
       // the same repo from a second account: nothing cloned, its push account kept (Review Focus 5)
       const again = await co.checkout({ repo, account: { login: 'c3-sahn', source: 'gh' }, folder: '~/github' });
@@ -112,7 +126,7 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
       const e = await rejects(co.checkout({ repo: { ...repo, cloneUrl: path.join(tmp, 'missing.git') }, account: { login: 'seanahn', source: 'gh' }, folder }));
       assert.ok(e.message && !e.message.includes(B64) && !e.message.includes(TOKEN), e.message);
       assert.ok(/does not exist|not found|fatal/i.test(e.message), e.message);
-      assert.ok(!fs.existsSync(path.join(folder, 'perch.gannet-partial')));
+      assert.ok(!fs.readdirSync(folder).some((n) => n.includes('gannet-partial')));
       assert.ok(!fs.existsSync(path.join(folder, 'perch')));
     }
 
@@ -145,7 +159,7 @@ async function rejects(p) { try { await p; } catch (e) { return e; } throw new E
       const e = await rejects(first);
       assert.strictEqual(e.message, 'cancelled');
       assert.ok(children[0].killed);
-      assert.ok(!fs.existsSync(path.join(folder, 'perch.gannet-partial')));
+      assert.ok(!fs.readdirSync(folder).some((n) => n.startsWith('perch.gannet-partial')));
       await new Promise((r) => setTimeout(r, 50));
       assert.strictEqual(children.length, 2, 'then the second starts');
       children[1].finish();

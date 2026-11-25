@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const childProcess = require('child_process');
-const { parseOrigin, originOf, expandHome, isDir, PARTIAL } = require('./localRepos.js');
+const { parseOrigin, originOf, expandHome, isDir, partialOf } = require('./localRepos.js');
 
 const KEY = 'credential.https://github.com';
 
@@ -13,7 +13,7 @@ function chooseTarget(folder, repo, { isDir: dirExists = isDir, originOf: origin
   for (const name of [repo.name, `${repo.owner}-${repo.name}`]) {
     const p = path.join(folder, name);
     if (!dirExists(p)) return { path: p, existing: false };
-    if (parseOrigin(origin(p)) === repo.fullName) return { path: p, existing: true };
+    if (String(parseOrigin(origin(p))).toLowerCase() === repo.fullName.toLowerCase()) return { path: p, existing: true };
   }
   return { ask: true };
 }
@@ -33,6 +33,9 @@ function ghHelper(login) {
 }
 
 async function configurePush(run, dir, login, helper) {
+  // clear what an earlier setup left (exit 5: there was nothing to clear), so this can run more than once
+  const cleared = await run('git', ['-C', dir, 'config', '--local', '--unset-all', `${KEY}.helper`]);
+  if (cleared.code !== 0 && cleared.code !== 5) throw new Error(`git config failed: ${(cleared.stderr || '').trim()}`);
   for (const args of pushConfigArgs(login, helper)) {
     const res = await run('git', ['-C', dir, ...args]);
     if (res.code !== 0) throw new Error(`git config failed: ${(res.stderr || '').trim()}`);
@@ -51,8 +54,14 @@ function createCheckout({ run, spawn = childProcess.spawn, local, accounts, help
     const secret = Buffer.from('x-access-token:' + token).toString('base64');
     const mask = (s) => String(s).split(secret).join('***').split(token).join('***');
     return new Promise((resolve, reject) => {
-      const child = spawn('git', ['-c', `http.extraHeader=Authorization: Basic ${secret}`, 'clone', '--progress', url, dest],
-        { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+      // the sign-in goes in git's environment (not argv, which other users can read), scoped to github.com, and the
+      // machine's own credential helpers are switched off so the clone never quietly runs as another account
+      const env = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
+      const n = Number(env.GIT_CONFIG_COUNT) || 0;
+      const pairs = [['http.https://github.com/.extraHeader', `Authorization: Basic ${secret}`], ['credential.helper', '']];
+      pairs.forEach(([k, v], i) => { env[`GIT_CONFIG_KEY_${n + i}`] = k; env[`GIT_CONFIG_VALUE_${n + i}`] = v; });
+      env.GIT_CONFIG_COUNT = String(n + pairs.length);
+      const child = spawn('git', ['clone', '--progress', url, dest], { stdio: ['ignore', 'pipe', 'pipe'], env });
       let stderr = '', cancelled = false;
       const sub = cancel && cancel.onCancellationRequested(() => { cancelled = true; child.kill(); });
       if (cancel && cancel.isCancellationRequested) { cancelled = true; child.kill(); }
@@ -85,7 +94,7 @@ function createCheckout({ run, spawn = childProcess.spawn, local, accounts, help
     }
     const token = await accounts.token(account.login);   // no usable token: stop before git runs
     fs.mkdirSync(path.dirname(target.path), { recursive: true });
-    const partial = target.path + PARTIAL;
+    const partial = partialOf(target.path);
     fs.rmSync(partial, { recursive: true, force: true });
     try {
       await clone(repo.cloneUrl, partial, token, cancel, onProgress);
@@ -94,8 +103,11 @@ function createCheckout({ run, spawn = childProcess.spawn, local, accounts, help
       fs.rmSync(partial, { recursive: true, force: true });
       throw e;
     }
-    await configurePush(run, target.path, account.login, helperCommand(account));
-    await local.remember(repo.fullName, { path: target.path, login: account.login, byGannet: true });
+    // no helper (VS Code accounts when this window cannot serve tokens): write nothing rather than a broken setting;
+    // the repo is remembered with no account, so the tree offers Push as later
+    const helper = helperCommand(account);
+    if (helper) await configurePush(run, target.path, account.login, helper);
+    await local.remember(repo.fullName, { path: target.path, login: helper ? account.login : null, byGannet: true });
     return { path: target.path, existing: false };
   }
 

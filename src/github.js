@@ -53,7 +53,9 @@ const mapRepo = (r) => ({
   defaultBranch: r.default_branch, htmlUrl: r.html_url, cloneUrl: r.clone_url,
 });
 const ORDER = { dir: 0, file: 1, symlink: 1, submodule: 1 };
-const mapEntry = (e) => ({ name: e.name, path: e.path, type: e.type, size: e.size || 0, htmlUrl: e.html_url });
+// GitHub lists a submodule inside a folder as type "file" with no download_url; only fetching it says "submodule"
+const typeOf = (e) => (e.type === 'file' && e.download_url === null ? 'submodule' : e.type);
+const mapEntry = (e) => ({ name: e.name, path: e.path, type: typeOf(e), size: e.size || 0, htmlUrl: e.html_url || '' });
 
 function createClient({ fetch, token }) {
   async function get(url, accept = 'application/vnd.github+json') {
@@ -80,7 +82,14 @@ function createClient({ fetch, token }) {
       return out.slice(0, max);
     },
     async listDir(owner, repo, path) {
-      const res = await get(`${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodePath(path)}`);
+      let res;
+      try {
+        res = await get(`${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodePath(path)}`);
+      } catch (e) {
+        // an empty repo's root answers 404 "This repository is empty." (409 elsewhere)
+        if (!path && e.kind === 'notFound' && /repository is empty/i.test(e.message)) e.kind = 'empty';
+        throw e;
+      }
       const body = await res.json();
       const list = Array.isArray(body) ? body : [body];
       const entries = list.map(mapEntry).sort((a, b) => (ORDER[a.type] - ORDER[b.type]) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
