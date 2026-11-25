@@ -1,0 +1,27 @@
+{
+  "name": "gannet",
+  "displayName": "Gannet",
+  "description": "Your GitHub repos as a tree: browse files without cloning, check out into your workspace, push as the right account.",
+  "version": "0.1.0",
+  "publisher": "seanahn",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/seanahn/gannet"
+  },
+  "engines": {
+    "vscode": "^1.94.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "scripts": {
+    "check": "for f in src/*.js bin/*.js; do [ ! -f \"$f\" ] || node --check \"$f\" || exit 1; done",
+    "test:offline": "node test/github.test.js",
+    "test": "npm run -s test:offline"
+  }
+}

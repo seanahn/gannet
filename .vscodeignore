@@ -1,0 +1,8 @@
+.git/**
+.gitignore
+.superpowers/**
+.env
+test/**
+docs/**
+Makefile
+*.vsix
