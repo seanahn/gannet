@@ -1,8 +1,9 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) designed, not built. How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
+0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
 
 ## Intent
 
@@ -189,7 +190,8 @@ GANNET
   *(builder's call)*
 
 - ⟳ marks every account's list stale: the next time All repos is opened it is fetched again and the file
-  replaced; until then the owners still come from the old file. *(builder's call)*
+  replaced; until then the owners, and the repos Recent filters by, still come from the old file. *(builder's call;
+  build ruling: so after ⟳, Recent can still show a repo GitHub no longer lists until All repos is opened)*
 - Recent keeps up to 50 used repos per account, so each owner still has its own used repos to show; each owner
   shows at most 10. *(builder's call)*
 - Organizations show an organization icon, users a person icon. *(builder's call)*
@@ -206,7 +208,7 @@ GANNET
   per repo".
 - Expanding a repo:
   - with one checkout, it lists that checkout's files from disk;
-  - with more than one, it lists one node per checkout (its path, e.g. `/git/perch-2`), each expanding to its
+  - with more than one, it lists one node per checkout (its path, e.g. `/git/seanahn-perch`), each expanding to its
     files;
   - with none, it lists the files on GitHub, as before.
   *(builder's call)*
@@ -249,7 +251,8 @@ GANNET
   - **Missing** workspaces are not offered; when every workspace is Missing, it is as if there were none.
     *(builder's call)*
 - **Folder name:** the first free one of `<repo>`, `<owner>-<repo>`, `<repo>-2`, `<repo>-3`, … — so a second copy
-  in the same workspace is `<repo>-2`, with no prompt. A folder is never reused, by **Check out** or **Check out
+  in the same workspace is `<owner>-<repo>` and a third `<repo>-2`, with no prompt. *(build ruling: the plan's
+  test expected `<repo>-2` for the second copy; the order above stands)* A folder is never reused, by **Check out** or **Check out
   to…**: 0.1.0's "same repo already there: just remember and add it" is gone, since a checkout already there is
   already listed; the folder can be renamed later,
   since Gannet finds checkouts by their `origin`. *(Sean chose no prompt)*
@@ -379,7 +382,8 @@ Rulings settled while planning the build, all builder's calls:
   on GitHub** and leaves Recent. Tree items carry no ids, since a repo shows under both Recent and All repos.
 - **Sign in** on a signed-out VS Code account runs VS Code's account picker. **Reveal in Explorer** reveals the
   folder in VS Code's explorer when it is a workspace folder, and in the system's file manager otherwise.
-- Workspaces (0.2.0):
+- Workspaces (0.2.0) — history: 0.3.0 replaced workspace files with directories, so most of this list no
+  longer applies:
   - An edit to a workspace file follows the file's own indentation (tabs, or the width of its spaces) and line
     endings, so the lines it does not touch stay as they were.
   - A new window resumes only the checkouts whose window is gone, so opening a workspace while a checkout runs

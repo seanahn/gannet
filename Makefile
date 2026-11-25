@@ -17,10 +17,10 @@ VSIX = gannet-$(VERSION).vsix
 
 EXT_ID = seanahn.gannet-$(VERSION)
 # links made under earlier versions
-OLD_IDS = seanahn.gannet-0.1.0
+OLD_IDS = seanahn.gannet-0.1.0 seanahn.gannet-0.2.0
 EXT_DIRS = /home/sahn/.vscode/extensions /home/sahn/.local/share/code-server/extensions /home/sahn/.vscode-server/extensions
 
-## Install the one runtime dependency (jsonc-parser)
+## Install runtime dependencies (there are none; kept so `install` stays the same)
 deps:
 	npm install --omit=dev --silent
 
