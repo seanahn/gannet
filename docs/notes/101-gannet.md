@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0). How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) designed, not built. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 
@@ -118,97 +118,137 @@ GANNET                                   [+ account] [⟳]
 - Binary files open the way VS Code opens any binary file. Files over 10 MB show a note instead and offer
   **Open on GitHub**. *(builder's call on the size)*
 
-## Workspaces
+## Owners and workspace directories (0.3.0)
 
-Added after 0.1.0. Sean keeps repos two ways: locally, a VS Code workspace file (`fennets.code-workspace`, whose
-folders are repos under `/git`); on seclab, one folder (his home) with the repos as its subfolders. Gannet should
-know these places, show them first, and check repos out into them. *(Sean asked for workspaces at the top with a
-way to add one; the shape below is the builder's suggestion, which Sean accepted: "ok as you wish")*
+0.3.0 replaces how 0.2.0 grouped the tree, and replaces its Workspaces design. Where this section and the older
+sections above or below disagree, this section wins. *(Sean, on seeing 0.2.0 on seclab: "not quite what i was
+thinking of")*
 
 ```
 GANNET
-▾ WORKSPACES                              [+]
-  ▾ fennets            ● this window
-     ▸ fennets
-     ▸ lattice
-  ▸ seclab-home        ~/
-▾ REPOS                                   [+ account] [⟳]
-  ▸ c3-sahn   gh
-  ▸ seanahn   gh
+▾ WORKSPACES                                    [+]
+    /git
+    ~/github
+▾ REPOS                                         [+ account] [⟳]
+  ▾ c3-e  (c3-sahn)
+      c3reliability          private
+      c3nexus                ~/ · /git            (green Octocat: checked out)
+      ▸ All repos
+  ▾ seanahn
+      perch                  /git
+      ▸ All repos
 ```
 
-- A second view, **Workspaces**, above **Repos** in Gannet's sidebar. Each view collapses and resizes on its own,
-  and each header holds its own buttons. *(Sean: "as you wish")*
-- **Two kinds of workspace.** *(builder's suggestion, accepted)*
-  - **Workspace file** (`.code-workspace`): its folders are repos that live wherever they are. It has a **repo
-    folder** where Gannet puts new clones: the folder most of its folders sit in, else the folder the file sits
-    in; **Set repo folder…** changes it.
-  - **Folder**: its repos are its subfolders, and new clones go inside it.
-- **The list** is kept per machine, so seclab and the local machine each have their own. *(guess, not
-  corrected)* It lives in `machine.json` in Gannet's global storage folder, which under Remote-SSH is on the
-  remote; `globalState` is kept by the local client and shared by every machine, so it is not used for anything
-  tied to a machine. *(builder's call, after review)* This window's workspace is listed
-  automatically, marked **● this window**, when it is a saved workspace file or a single folder. An untitled
-  multi-root window is not listed; its node reads **Untitled workspace — save it to list it**. *(builder's call)*
-- **Expanding a workspace** lists its folders (a workspace file's folders; a folder's subfolders), each opening
-  with its files from disk. A folder whose `origin` is on github.com shows as a repo, with **● local** and its
-  push account, and the repo actions of a checked-out repo. *(builder's call)*
-- **+** offers: **Add workspace file…**, **Add folder…**, **New workspace…** (asks a name and the repo folder,
-  creates `<repo folder>/<name>.code-workspace` with no folders). *(builder's call)*
-- On a workspace: click or **Open** opens it in a new window; **Open here** replaces this window; **Remove from
-  list** forgets it and deletes nothing. Opening a workspace is always the user's explicit action; checkout never
-  opens a window. *(builder's call, in line with Sean's "do not open a new window" for checkout)*
-- A workspace whose file or folder is gone shows **Missing** with **Remove from list**. *(builder's call)*
+### The tree is grouped by owner
 
-**Checkout with workspaces** (replaces the default-folder rule below when a workspace applies):
+- The top-level nodes are **owners**, meaning the GitHub users and organizations whose repos an account can reach.
+  An owner reached through an account with a different login is labelled with that account in brackets:
+  `c3-e (c3-sahn)`. The account's own owner node is just its login: `seanahn`. *(Sean)*
+- An owner reachable through two accounts gets two nodes, one per account, each with its account in brackets.
+  *(builder's call)*
+- The owners shown for an account:
+  - the account's own login;
+  - its organizations (`GET /user/orgs`);
+  - owners of repos it recently pushed to;
+  - once its full repo list has been fetched, any other owner in that list (a repo you collaborate on).
+  *(builder's call)*
+- Order: each account's own node first, in account order, then the other owners by name. *(builder's call)*
+- Repo names drop the owner: `c3reliability`, not `c3-e/c3reliability`. *(Sean)*
+- **Each owner node lists its recent repos, then an All repos link** that expands to every repo of that owner the
+  account can reach. *(Sean: "per owner")* Recent per owner works as before (repos used in Gannet first, then
+  GitHub's recently pushed list), filtered to that owner, at most 10. All repos is the account's full list,
+  fetched once and shared by all its owner nodes, filtered to the owner.
+- Account things live on the account's own node:
+  - its source (`gh` or `VS Code`) in the tooltip;
+  - **Hide account**;
+  - a signed-out or rate-limit error in place of its children. A signed-out account lists no organizations, since
+    they cannot be fetched.
+  *(builder's call)*
 
-- **Check out** goes to this window's workspace: into a folder workspace's folder, or into a workspace file's
-  repo folder and then added to it. With no listed workspace (an empty or untitled window), it goes to
-  `gannet.checkoutFolder` and is appended to the window, as before. *(builder's suggestion, accepted)*
-- In a folder window, a clone inside the folder already shows in Explorer, so no workspace folder is added — and
-  the window does not turn multi-root or restart extensions. *(builder's call)*
-- **Check out to…** lists the workspaces first, then **Other folder…** (the old folder picker). Choosing a
-  workspace other than this window's clones the repo there and, for a workspace file, writes the new folder into
-  that file; this window does not change. The file is edited in place, keeping its comments and other settings,
-  with the folder path written relative to the file when it lies under the file's folder. *(builder's
-  suggestion, accepted; builder's call on the path form)*
-- **A repo already checked out somewhere is reused, never cloned again.** *(Sean: "Reuse the copy you have")*
-  Checking it out into another workspace adds its existing folder to that workspace (written into a workspace
-  file; for a folder workspace it cannot be added, so a note says where the repo already is and offers **Reveal
-  in Explorer**). One copy per repo per machine; its push account is unchanged.
-- A single folder that is itself a git repo (one repo opened alone) is not a workspace: it is not listed, and
-  **Check out** there falls back to `gannet.checkoutFolder`, so a repo is never cloned inside a repo. *(builder's
-  call)*
-- Workspaces shown **Missing** are not offered in **Check out to…**. *(builder's call)*
-- Writing another workspace file re-reads it just before the write, so a change another window made is kept. If
-  the file cannot be parsed or written, the clone stays and is remembered, and a note gives its path and the
-  file that could not be updated. *(builder's call)*
-- The pending checkout record names its target workspace; one cut off by a restart finishes into that workspace,
-  never into this window. *(builder's call)*
-- Every listed workspace's repo folder or folder is scanned on start, like the default folder, so repos there
-  show **● local** in Repos; partial clones left by dead windows are removed there too. *(builder's call)*
-- The rest of Checkout (target naming, partial folders, push account, queue) is unchanged.
+### Checked-out repos
 
-Checking out into a workspace:
+- A repo checked out anywhere on this machine has a **green Octocat** (`github-alt` coloured `charts.green`),
+  instead of 0.2.0's clone icon. *(Sean)*
+- Its description lists the workspaces it is checked out in, after private/archived, e.g. `~/ · /git`. *(Sean:
+  "each repo may say - <workspace>")* A checkout in a folder outside every workspace shows that folder's parent.
+- **A repo can be checked out more than once**, into different folders. *(Sean)* This reverses 0.2.0's "one copy
+  per repo".
+- Expanding a repo:
+  - with one checkout, it lists that checkout's files from disk;
+  - with more than one, it lists one node per checkout (its path, e.g. `/git/perch-2`), each expanding to its
+    files;
+  - with none, it lists the files on GitHub, as before.
+  *(builder's call)*
+- **Reveal in Explorer** and **Push as** act on one checkout. On a repo with more than one checkout they are on each
+  checkout node. *(builder's call)*
+
+### Workspaces are directories
+
+- The **Workspaces** panel stays a separate view above the tree. It is a small settings panel: a list of
+  directories that hold checkouts, e.g. `/git` and `~/github` locally, `~/` on seclab. *(Sean: "workspace can
+  just be managing workspace directories … a little configuration panel on top")*
+- A workspace node shows the directory (with `~` for home), with the full path as its tooltip. It does not expand.
+  A directory that no longer exists shows **Missing**. *(builder's call)*
+- **+** picks a directory and adds it; **Remove from list** forgets one and deletes nothing; **Reveal** shows it in
+  the system's file manager. *(builder's call)*
+- `.code-workspace` files are no longer workspaces, and Gannet no longer edits them. That drops the `jsonc-parser`
+  dependency. *(builder's reading of "managing workspace directories", stated to Sean and not corrected)*
+- Nothing is added to the list automatically, except once, on upgrading: 0.2.0's list carries over (its folders
+  as they are, each workspace file replaced by its repo folder), and so does the `gannet.checkoutFolder` folder
+  (`~/github` by default) if it exists, so earlier users keep checking out there without being asked. The setting
+  is then retired. *(builder's call)*
+- A checkout belongs to the deepest listed workspace that contains it (with `~/` and `~/github` both listed,
+  `~/github/perch` shows as `~/github`). *(builder's call)*
+- The list stays per machine, in `machine.json`, as in 0.2.0.
+- Every listed workspace is scanned on start for clones, by their `origin`. A
+  workspace can hold several clones of one repo. Partial clones of dead windows are removed there too.
+
+### Checking out
+
+- **Check out** *(Sean)*:
+  - **No workspace yet:** it asks for a directory, suggesting `~/github`, and saves it as a workspace. *(builder's
+    guess, not corrected)*
+  - **One workspace:** the repo goes there, with no question.
+  - **Several:** a quick pick of the workspaces chooses where; the first entry is the workspace that holds the
+    most folders of this window. *(builder's call on the order)*
+  - **Already checked out:** the quick pick is shown even with one workspace, so Sean decides where the next copy
+    goes; it ends with **Other folder…**. *(Sean; builder's call on Other folder…)*
+  - **Missing** workspaces are not offered; when every workspace is Missing, it is as if there were none.
+    *(builder's call)*
+- **Folder name:** the first free one of `<repo>`, `<owner>-<repo>`, `<repo>-2`, `<repo>-3`, … — so a second copy
+  in the same workspace is `<repo>-2`, with no prompt. A folder is never reused, by **Check out** or **Check out
+  to…**: 0.1.0's "same repo already there: just remember and add it" is gone, since a checkout already there is
+  already listed; the folder can be renamed later,
+  since Gannet finds checkouts by their `origin`. *(Sean chose no prompt)*
+- **Check out to…** still picks any folder for one checkout, without adding it to the list. *(builder's call)*
+- Every copy pushes as the account it was checked out from. *(Sean, from 0.1.0)*
+- After cloning, the folder is added to the open window, unless it already sits inside one of the window's
+  folders (seclab, where the window is `~/`). *(as 0.2.0)* No window is ever opened.
+- A checkout cut off by an extension restart is resumed by the next start of the same window's extension host,
+  as in 0.2.0. The pending record names the target folder once it is chosen; if that folder already holds the
+  clone when the job resumes (the restart came after the rename), the job only finishes setting it up and adding
+  it, and never clones a copy. *(builder's call, from the builder check)*
+- Unchanged from 0.1.0: the token is fetched before git runs (stop with the signed-out error if there is none),
+  one clone at a time, progress with **Cancel**, and if VS Code refuses the folder a note offers **Add to
+  workspace**.
 
 ```
- User        Workspaces/Repos view     Checkout          git / Disk        Workspace file      This window
-  |                |                      |                    |                  |                 |
-  |-- Check out to… -> pick workspace W (Missing ones not offered)               |                 |
-  |                |-- checkout(repo, W) ->|                    |                  |                 |
-  |                |                      |-- save pending {repo, account, W}     |                 |
-  |                |                      | [repo already local at P]  no clone; target = P         |
-  |                |                      |-- clone into W's repo folder (partial, rename) -------->|  |
-  |                |                      | [clone fails / Cancel]  partial removed, error shown    |
-  |                |                      |-- push settings, remember path ----->|                  |
-  |                |                      | [W is this window, file]  updateWorkspaceFolders ------------------->|
-  |                |                      | [W is this window, folder]  nothing to add (already inside)          |
-  |                |                      | [W is another file]  re-read, add folder, write ------>|          |
-  |                |                      |   [unparseable / read-only]  note: cloned at P, W not updated       |
-  |                |                      | [W is another folder, repo elsewhere]  note: already at P, Reveal  |
-  |                |                      |-- clear pending   |                  |                 |
-  |                |                      | [cut off by a restart]  next start resumes into W, never this window
-  |<-- W's node lists the repo; Repos shows ● local                                                  |
+ User            Tree               Workspaces list       git / Disk              This window
+  |                |                      |                    |                        |
+  |-- Check out -->|-- list ------------->|                    |                        |
+  |                | [none / all Missing]  ask a directory (suggest ~/github), save it; [cancel] stop |
+  |                | [one]   use it        |                    |                        |
+  |                | [several, or already checked out]  quick pick of workspaces        |
+  |<-- pick -------|                      |                    |                        |
+  |                |-- first free name: <repo>, <owner>-<repo>, <repo>-2… ->|              |
+  |                |-- pending {repo, account, target} in machine.json  |                       |
+  |                |-- token; clone into a partial folder (queue, progress, Cancel), rename ->|    |
+  |                | [fails / Cancel]  partial removed, git's error shown              |
+  |                |-- push as the account; remember this checkout  |                       |
+  |                |-- add to window, unless inside one of its folders --------------------->|
+  |                | [refused]  note with Add to workspace;  then clear pending                 |
+  |                | [restart after the rename]  resume finds the clone at target: set up + add, no new clone |
+  |<-- green Octocat, "~/ · /git" ---------|                    |                        |
 ```
 
 ## Checkout
