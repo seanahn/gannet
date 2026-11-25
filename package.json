@@ -21,7 +21,214 @@
   ],
   "scripts": {
     "check": "for f in src/*.js bin/*.js; do [ ! -f \"$f\" ] || node --check \"$f\" || exit 1; done",
-    "test:offline": "node test/github.test.js && node test/accounts.test.js && node test/state.test.js && node test/checkout.test.js && node test/tokenServer.test.js && node test/fsProvider.test.js && node test/tree.test.js",
+    "test:offline": "node test/github.test.js && node test/accounts.test.js && node test/state.test.js && node test/checkout.test.js && node test/tokenServer.test.js && node test/fsProvider.test.js && node test/tree.test.js && node test/host.test.js",
     "test": "npm run -s test:offline"
+  },
+  "main": "./src/extension.js",
+  "icon": "media/icon.png",
+  "activationEvents": [
+    "onStartupFinished",
+    "onFileSystem:gannet"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gannet",
+          "title": "Gannet",
+          "icon": "media/gannet.svg"
+        }
+      ]
+    },
+    "views": {
+      "gannet": [
+        {
+          "id": "gannet.repos",
+          "name": "Repos"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "gannet.addAccount",
+        "title": "Add GitHub Account",
+        "category": "Gannet",
+        "icon": "$(add)"
+      },
+      {
+        "command": "gannet.refresh",
+        "title": "Refresh",
+        "category": "Gannet",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gannet.hideAccount",
+        "title": "Hide Account",
+        "category": "Gannet"
+      },
+      {
+        "command": "gannet.signIn",
+        "title": "Sign In",
+        "category": "Gannet"
+      },
+      {
+        "command": "gannet.checkout",
+        "title": "Check Out",
+        "category": "Gannet",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "gannet.checkoutTo",
+        "title": "Check Out to\u2026",
+        "category": "Gannet"
+      },
+      {
+        "command": "gannet.openOnGitHub",
+        "title": "Open on GitHub",
+        "category": "Gannet",
+        "icon": "$(github)"
+      },
+      {
+        "command": "gannet.revealLocal",
+        "title": "Reveal in Explorer",
+        "category": "Gannet"
+      },
+      {
+        "command": "gannet.addToWorkspace",
+        "title": "Add to Workspace",
+        "category": "Gannet"
+      },
+      {
+        "command": "gannet.pushAs",
+        "title": "Push as This Account",
+        "category": "Gannet"
+      },
+      {
+        "command": "gannet.openFile",
+        "title": "Open File",
+        "category": "Gannet"
+      },
+      {
+        "command": "gannet.openUrl",
+        "title": "Open URL",
+        "category": "Gannet"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "gannet.hideAccount",
+          "when": "false"
+        },
+        {
+          "command": "gannet.signIn",
+          "when": "false"
+        },
+        {
+          "command": "gannet.checkout",
+          "when": "false"
+        },
+        {
+          "command": "gannet.checkoutTo",
+          "when": "false"
+        },
+        {
+          "command": "gannet.openOnGitHub",
+          "when": "false"
+        },
+        {
+          "command": "gannet.revealLocal",
+          "when": "false"
+        },
+        {
+          "command": "gannet.addToWorkspace",
+          "when": "false"
+        },
+        {
+          "command": "gannet.pushAs",
+          "when": "false"
+        },
+        {
+          "command": "gannet.openFile",
+          "when": "false"
+        },
+        {
+          "command": "gannet.openUrl",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "gannet.addAccount",
+          "when": "view == gannet.repos",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gannet.refresh",
+          "when": "view == gannet.repos",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "gannet.checkout",
+          "when": "view == gannet.repos && viewItem == repo-remote",
+          "group": "inline"
+        },
+        {
+          "command": "gannet.checkout",
+          "when": "view == gannet.repos && viewItem == repo-remote",
+          "group": "1_checkout@1"
+        },
+        {
+          "command": "gannet.checkoutTo",
+          "when": "view == gannet.repos && viewItem == repo-remote",
+          "group": "1_checkout@2"
+        },
+        {
+          "command": "gannet.revealLocal",
+          "when": "view == gannet.repos && viewItem =~ /^repo-local/",
+          "group": "1_checkout@1"
+        },
+        {
+          "command": "gannet.addToWorkspace",
+          "when": "view == gannet.repos && viewItem =~ /^repo-local/",
+          "group": "1_checkout@2"
+        },
+        {
+          "command": "gannet.pushAs",
+          "when": "view == gannet.repos && viewItem == repo-local-foreign",
+          "group": "1_checkout@3"
+        },
+        {
+          "command": "gannet.openOnGitHub",
+          "when": "view == gannet.repos && viewItem =~ /^repo-/",
+          "group": "2_github@1"
+        },
+        {
+          "command": "gannet.hideAccount",
+          "when": "view == gannet.repos && viewItem =~ /^account-/",
+          "group": "1_account@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Gannet",
+      "properties": {
+        "gannet.checkoutFolder": {
+          "type": "string",
+          "default": "~/github",
+          "description": "The folder repos are checked out into. Check Out to\u2026 picks another place for one repo."
+        },
+        "gannet.hiddenAccounts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "GitHub logins Gannet does not show. Hiding never signs an account out of gh or VS Code."
+        }
+      }
+    }
   }
 }
