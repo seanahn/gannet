@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { labelOf, tilde } = require('./workspaces.js');
 const { toUri } = require('./fsProvider.js');
+const { branchOf } = require('./localRepos.js');
 
 const LARGE = 10 * 1024 * 1024;
 const PUSHED_PAGE = 100;   // Recent's pool from GitHub: one page of the recently pushed repos
@@ -30,6 +31,9 @@ function diskTreeItem(vs, node) {
   if (!node.dir) it.command = { command: 'vscode.open', title: 'Open', arguments: [it.resourceUri] };
   return it;
 }
+
+/** A checkout in a tooltip: where it is, its branch, and whom it pushes as. */
+const checkoutLine = (c) => [c.path, branchOf(c.path), c.login && `pushes as ${c.login}`].filter(Boolean).join(' · ');
 
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();   // GitHub names ignore case
 
@@ -225,8 +229,7 @@ class GannetTree {
         const places = [...new Set(copies.map((c) => labelOf(c.path, list, this.home)))];
         it.description = [repo.private && 'private', repo.archived && 'archived', ...places].filter(Boolean).join(' · ');
         it.contextValue = !copies.length ? 'repo-remote' : copies.length > 1 ? 'repo-multi' : copies[0].login ? 'repo-local' : 'repo-local-foreign';
-        it.tooltip = !copies.length ? `${repo.fullName} — only on GitHub`
-          : [repo.fullName, ...copies.map((c) => `${c.path}${c.login ? ` (pushes as ${c.login})` : ''}`)].join('\n');
+        it.tooltip = !copies.length ? 'Only on GitHub' : copies.map(checkoutLine).join('\n');   // Sean: the row already names the repo
         it.iconPath = copies.length ? new vs.ThemeIcon('github-alt', new vs.ThemeColor('charts.green')) : new vs.ThemeIcon('github-alt');
         return it;
       }
@@ -234,7 +237,7 @@ class GannetTree {
         const c = node.checkout;
         const it = new vs.TreeItem(tilde(c.path, this.home), S.Collapsed);
         it.contextValue = c.login ? 'checkout-local' : 'checkout-local-foreign';
-        it.tooltip = `${c.path}${c.login ? `\npushes as ${c.login}` : ''}`;
+        it.tooltip = checkoutLine(c);
         it.resourceUri = vs.Uri.file(c.path);
         it.iconPath = vs.ThemeIcon.Folder;
         return it;

@@ -70,6 +70,7 @@ const S = vscode.TreeItemCollapsibleState;
     assert.strictEqual(item(perchNode).contextValue, 'repo-remote');
     assert.strictEqual(item(perchNode).iconPath.id, 'github-alt', 'the Octocat without the circle');
     assert.strictEqual(item(perchNode).iconPath.color, undefined, 'not checked out: not green');
+    assert.strictEqual(item(perchNode).tooltip, 'Only on GitHub');
     assert.strictEqual(item(allNode).collapsibleState, S.Collapsed);
 
     // All repos: the account's full list, this owner's part, sorted; read once, then kept on disk
@@ -169,6 +170,8 @@ const S = vscode.TreeItemCollapsibleState;
       await workspaces.add(gws); await workspaces.add(other);
       const p1 = path.join(gws, 'perch'), p2 = path.join(other, 'perch');
       for (const p of [p1, p2]) { fs.mkdirSync(path.join(p, '.git'), { recursive: true }); fs.writeFileSync(path.join(p, 'f.txt'), 'x'); }
+      fs.writeFileSync(path.join(p1, '.git', 'HEAD'), 'ref: refs/heads/feat/x\n');
+      fs.writeFileSync(path.join(p2, '.git', 'HEAD'), '0123456789abcdef0123456789abcdef01234567\n');
       await local.remember('seanahn/perch', { path: p1, login: 'seanahn', byGannet: true });
       await local.remember('seanahn/perch', { path: p2, login: null, byGannet: false });
       const perch = { kind: 'repo', account: accountList[1], repo: R('seanahn/perch', { private: true }) };
@@ -177,10 +180,23 @@ const S = vscode.TreeItemCollapsibleState;
       assert.strictEqual(it.iconPath.id, 'github-alt');
       assert.strictEqual(it.iconPath.color.id, 'charts.green');
       assert.strictEqual(it.contextValue, 'repo-multi');
+      // Sean: the tooltip leaves out the repo's name, and shows each checkout's branch
+      assert.strictEqual(it.tooltip, `${p1} · feat/x · pushes as seanahn\n${p2} · detached at 0123456`);
       const copies = await tree.getChildren(perch);
       assert.deepStrictEqual(copies.map((n) => item(n).label), ['~/github/perch', p2]);
       assert.deepStrictEqual(copies.map((n) => item(n).contextValue), ['checkout-local', 'checkout-local-foreign']);
-      assert.strictEqual(item(copies[0]).tooltip, `${p1}\npushes as seanahn`);
+      assert.strictEqual(item(copies[0]).tooltip, `${p1} · feat/x · pushes as seanahn`);
+      assert.strictEqual(item(copies[1]).tooltip, `${p2} · detached at 0123456`);
+      // a worktree's .git is a file naming its git dir; no .git: no branch
+      const { branchOf } = require('../src/localRepos.js');
+      const wt = path.join(tmp, 'wt'), gd = path.join(tmp, 'wtgit');
+      fs.mkdirSync(wt); fs.mkdirSync(gd);
+      fs.writeFileSync(path.join(gd, 'HEAD'), 'ref: refs/heads/side\n');
+      fs.writeFileSync(path.join(wt, '.git'), `gitdir: ${gd}\n`);
+      assert.strictEqual(branchOf(wt), 'side');
+      fs.writeFileSync(path.join(wt, '.git'), 'gitdir: ../wtgit\n');
+      assert.strictEqual(branchOf(wt), 'side', 'relative to the worktree');
+      assert.strictEqual(branchOf(path.join(tmp, 'nowhere')), '');
       assert.strictEqual(item(copies[0]).collapsibleState, S.Collapsed);
       assert.deepStrictEqual((await tree.getChildren(copies[1])).map((n) => item(n).label), ['f.txt']);
       // one left: it is the repo's checkout again

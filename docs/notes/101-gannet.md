@@ -337,6 +337,12 @@ GANNET                               [+ account] [⟳]
   - owners: an organization or a person icon; repos: the Octocat, green when checked out; errors: a warning
     icon. *(as 0.3.0)*
   - icons are inline SVG in the page, like Perch's; no icon font or other dependency. *(builder's call)*
+- **A repo's tooltip does not repeat its name** (the row shows it). A repo only on GitHub says **Only on GitHub**; a
+  checked-out one has a line per checkout: its path, its branch (`detached at <sha>` when no branch is checked
+  out), and `pushes as <login>` when it pushes as an account, e.g. `/home/jovyan/c3nexus · main · pushes as
+  c3-sahn`. A checkout row's tooltip is its one line. The branch is read from the checkout's `.git` each time the
+  row is drawn, following a worktree's `.git` file. *(Sean: "you already know the repo, remove the first line from
+  tooltip and show the branch name if the repo is checked out"; builder's call on the line's format)*
 - **Colours and fonts come from the VS Code theme** (sidebar background, list hover and selection, description
   colour, `charts.green`), so it looks like a native tree in any theme. *(builder's call)*
 

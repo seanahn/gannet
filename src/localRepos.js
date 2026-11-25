@@ -27,6 +27,22 @@ function originOf(dir) {
   return m ? m[1] : '';
 }
 
+/** The checked-out branch, 'detached at <sha7>', or '' when unreadable; a worktree's .git file is followed. */
+function branchOf(dir) {
+  try {
+    let gitDir = path.join(dir, '.git');
+    if (fs.statSync(gitDir).isFile()) {
+      const m = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(gitDir, 'utf8'));
+      if (!m) return '';
+      gitDir = path.resolve(dir, m[1].trim());
+    }
+    const head = fs.readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim();
+    const ref = /^ref:\s*refs\/heads\/(.+)$/.exec(head);
+    if (ref) return ref[1];
+    return /^[0-9a-f]{7,}$/i.test(head) ? `detached at ${head.slice(0, 7)}` : '';
+  } catch { return ''; }
+}
+
 const keyOf = (fullName) => String(fullName).toLowerCase();   // GitHub names ignore case
 /** A partial clone's folder: tied to this window's process, so another window never removes one still in progress. */
 const partialOf = (target) => `${target}${PARTIAL}-${process.pid}`;
@@ -90,4 +106,4 @@ function createLocalRepos({ memento, home = os.homedir() }) {
   };
 }
 
-module.exports = { createLocalRepos, parseOrigin, originOf, expandHome, isDir, PARTIAL, partialOf, alive };
+module.exports = { createLocalRepos, parseOrigin, originOf, branchOf, expandHome, isDir, PARTIAL, partialOf, alive };
