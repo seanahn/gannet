@@ -14,7 +14,7 @@ const { GannetFs, toUri } = require('./fsProvider.js');
 const { GannetTree } = require('./tree.js');
 const W = require('./workspaces.js');
 const { createMachineState } = require('./machineState.js');
-const { alive } = require('./localRepos.js');
+const { alive, expandHome } = require('./localRepos.js');
 const { WorkspaceTree } = require('./workspaceTree.js');
 const { createRepoCache } = require('./repoCache.js');
 
@@ -72,7 +72,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   const tree = new GannetTree({ vscode, accounts, clientFor, recent, local, cache: createRepoCache(store), workspaces, home });
   const gfs = new GannetFs({ vscode, clientFor, accounts });
   const wsTree = new WorkspaceTree({ vscode, workspaces, home });
-  const refreshAll = () => { tree.refresh(); wsTree.refresh(); };
+  const refreshAll = () => { tree.redraw(); wsTree.refresh(); };   // only ⟳ reads the repo lists again
   state = { accounts, recent, local, tree, server, checkout, workspaces, wsTree };
 
   const inWorkspace = (p) => (vscode.workspace.workspaceFolders || []).some((f) => f.uri.fsPath === p);
@@ -97,6 +97,13 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   // a finished checkout goes into this window, unless it already shows inside one of its folders (seclab's ~/)
   const place = (p) => (windowFolders().some((d) => within(p, d)) ? true : addToWorkspace(p));
 
+  // a workspace is a folder that holds repos, never a repo, so nothing is ever cloned inside one
+  const isRepo = (f) => {
+    if (!W.isGitRepo(f)) return false;
+    vscode.window.showErrorMessage(`Gannet: ${f} is a git repo; add the folder that holds your repos.`);
+    return true;
+  };
+
   /** Where Check out puts a repo: asked when there is no workspace, several, or a copy already. */
   async function whereTo(repo) {
     const live = listed();
@@ -109,7 +116,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
       ], { title: 'Where should Gannet check out repos?' });
       if (!pick) return undefined;
       const dir = pick.choose ? await pickFolder('Where Gannet checks out repos', 'Use this folder') : pick.dir;
-      if (!dir) return undefined;
+      if (!dir || isRepo(dir)) return undefined;
       fs.mkdirSync(dir, { recursive: true });
       await workspaces.add(dir);
       wsTree.refresh();
@@ -166,7 +173,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   async function addWorkspace() {
     const f = await pickFolder('Add a folder Gannet checks repos out into', 'Add');
     if (!f) return;
-    if (W.isGitRepo(f)) { vscode.window.showErrorMessage(`Gannet: ${f} is a git repo; add the folder that holds your repos.`); return; }
+    if (isRepo(f)) return;
     await workspaces.add(f);
     local.cleanPartials(f);
     await local.scan(f);
@@ -175,8 +182,8 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
 
   const commands = {
     'gannet.refresh': () => { accounts.forgetAll(); tree.refresh(); },
-    'gannet.addAccount': async () => { const a = await accounts.addVsCodeAccount(); if (a) tree.refresh(); },
-    'gannet.signIn': async () => { await accounts.addVsCodeAccount(); tree.refresh(); },
+    'gannet.addAccount': async () => { const a = await accounts.addVsCodeAccount(); if (a) tree.redraw(); },
+    'gannet.signIn': async () => { await accounts.addVsCodeAccount(); tree.redraw(); },
     'gannet.hideAccount': async (node) => {
       if (!node || !node.account) return;
       const hidden = settings().get('hiddenAccounts', []) || [];
@@ -229,14 +236,17 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     vscode.window.createTreeView('gannet.repos', { treeDataProvider: tree, showCollapseAll: true }),
     vscode.workspace.registerFileSystemProvider('gannet', gfs, { isReadonly: true, isCaseSensitive: true }),
     ...Object.entries(commands).map(([id, fn]) => vscode.commands.registerCommand(id, fn)),
-    accounts.onDidChange(() => tree.refresh()),
+    accounts.onDidChange(() => tree.redraw()),
     vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration('gannet')) refreshAll(); }),
     { dispose: () => { if (server) server.close(); } },
   );
 
   // resume checkouts an extension restart cut off, one after another, without holding up activation
   state.resumed = (async () => {
-    await setPending(pending().map((j) => (j.id ? j : { ...j, id: newId() })));   // 0.2.0's jobs had no id
+    // 0.2.0's jobs had no id or target; its clone went to <folder>/<repo>, so look there first, and never clone twice
+    await setPending(pending().map((j) => (j.id ? j : {
+      ...j, id: newId(), target: j.target || (j.folder && j.repo ? path.join(path.resolve(expandHome(j.folder, home)), j.repo.name) : null),
+    })));
     for (const job of pending().filter((j) => !(j.pid && alive(j.pid)))) {
       await doCheckout({ kind: 'repo', repo: job.repo, account: job.account }, job.folder, { target: job.target || null, id: job.id });
     }

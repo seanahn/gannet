@@ -49,7 +49,11 @@ class GannetTree {
     this.listings = new Map();  // login fullName path -> { entries, truncated }
   }
 
+  /** ⟳: everything is read again, and each kept list from GitHub when its All repos next opens. */
   refresh() { this.clear(); this.refreshedAt = Date.now(); this.changed.fire(undefined); }
+
+  /** After a checkout, a workspace or account change: drawn again, the kept lists kept. */
+  redraw() { const full = this.full; this.clear(); this.full = full; this.changed.fire(undefined); }
 
   async getChildren(node) {
     try {

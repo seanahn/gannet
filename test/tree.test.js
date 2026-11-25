@@ -99,6 +99,14 @@ const S = vscode.TreeItemCollapsibleState;
     assert.ok(createRepoCache(cacheDir).get('seanahn').repos.some((r) => r.fullName === 'seanahn/new'));
     await t2.getChildren(seanAll2);
     assert.strictEqual(fullCalls('seanahn'), 2, 'once per refresh');
+    // Final review: a checkout, a workspace change or an account change redraws, and never reads GitHub's list again
+    t2.redraw();
+    await t2.getChildren((await t2.getChildren(await ownerNode('seanahn', t2))).at(-1));
+    assert.strictEqual(fullCalls('seanahn'), 2, 'a redraw keeps the kept list');
+    const t3 = make();
+    t3.redraw();
+    await t3.getChildren((await t3.getChildren(await ownerNode('seanahn', t3))).at(-1));
+    assert.strictEqual(fullCalls('seanahn'), 2, 'a redraw in a new window reads the file');
 
     // a remote repo's folders, lazily; opening it moves it to the top of Recent
     listings.set('seanahn seanahn/perch ', { entries: [E('src', 'dir'), E('big.bin', 'file', { size: 11 * 1024 * 1024 }), E('a.js', 'file'), E('lib', 'submodule'), E('link', 'symlink')], truncated: false });

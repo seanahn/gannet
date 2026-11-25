@@ -153,6 +153,24 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
       await ext.deactivate();
     }
 
+    // Final review: the first question's Choose a folder… refuses a git repo, as + does
+    {
+      const hC = path.join(t, 'hC');
+      const inRepo = path.join(hC, 'proj');
+      fs.mkdirSync(path.join(inRepo, '.git'), { recursive: true });
+      const c = ctx('storeC');
+      await ext.activateWith(c, { run, fetch, home: hC });
+      opts.quickPick = (items) => items.find((i) => i.choose);
+      opts.openDialog = [inRepo];
+      await ckout('nested');
+      assert.ok(!fs.existsSync(path.join(inRepo, 'nested')), 'not cloned inside a repo');
+      assert.deepStrictEqual(ext._state().workspaces.list(), [], 'not listed');
+      assert.strictEqual(rec.messages.at(-1).level, 'error');
+      opts.quickPick = undefined;
+      opts.openDialog = [path.join(tmp, 'picked')];
+      await ext.deactivate();
+    }
+
     const hB = path.join(t, 'hB');
     fs.mkdirSync(hB);
     const ghB = path.join(hB, 'github');
@@ -247,9 +265,13 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
     {
       const resumed = path.join(ghB, 'resumed');
       sh(`git clone -q "${bare}" resumed && git -C resumed remote set-url origin https://github.com/seanahn/resumed.git`, ghB);
+      // Final review: a 0.2.0 job whose clone was renamed into place before the restart
+      const done = path.join(ghB, 'done');
+      sh(`git clone -q "${bare}" done && git -C done remote set-url origin https://github.com/seanahn/done.git`, ghB);
       const c = seed(ctx('storeB'), 'gannet.pending', [
         { id: 'a', repo: R('resumed'), account, folder: ghB, target: resumed, pid: 999999999 },
         { repo: R('fresh'), account, folder: ghB, workspace: null, pid: 999999999 },   // 0.2.0's shape
+        { repo: R('done'), account, folder: ghB, workspace: null, pid: 999999999 },    // 0.2.0's, already cloned
         { id: 'c', repo: R('busy'), account, folder: ghB, target: null, pid: process.pid },
       ]);
       await ext.activateWith(c, { run, fetch, home: hB });
@@ -257,6 +279,8 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
       assert.ok(!fs.existsSync(path.join(ghB, 'seanahn-resumed')), 'not cloned twice');
       assert.strictEqual(sh('git config --local credential.https://github.com.username', resumed).trim(), 'seanahn');
       assert.ok(fs.existsSync(path.join(ghB, 'fresh', 'a.txt')));
+      assert.ok(!fs.existsSync(path.join(ghB, 'seanahn-done')), "0.2.0's finished clone is not cloned again");
+      assert.strictEqual(sh('git config --local credential.https://github.com.username', done).trim(), 'seanahn');
       assert.ok(!fs.existsSync(path.join(ghB, 'busy')), 'another window is still on it');
       assert.deepStrictEqual(machine(c)['gannet.pending'].map((j) => j.repo.name), ['busy']);
       await ext.deactivate();

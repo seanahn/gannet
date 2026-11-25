@@ -399,7 +399,7 @@ Rulings settled while planning the build, all builder's calls:
   - This window's workspace is added to the stored list on activation, so other windows on the machine see it.
   - **Push as** on a repo in the Workspaces view asks which account first, since a folder there has none.
   - **New workspace…** writes `{"folders": [], "settings": {}}`, and refuses a name that already exists.
-- Known gaps, left for later: the All repos count does not show; **More files** links break for branch names
+- Known gaps, left for later: **More files** links break for branch names
   with `/`; mixed-case logins may not reopen `gannet:` editors after a restart; partial folders outside the
   default checkout folder and the listed workspaces' folders are not cleaned; logins are not validated before being written into git config.
   From the Workspaces review: a workspace file starting with a byte-order mark cannot be read; after a fresh clone
