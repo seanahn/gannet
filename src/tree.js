@@ -12,6 +12,23 @@ const PUSHED_PAGE = 100;   // Recent's pool from GitHub: one page of the recentl
 const pad = (n) => String(n).padStart(2, '0');
 const byName = (a, b) => (a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0);
 
+/** A folder on disk as tree nodes: folders first, .git hidden; a missing folder says so. */
+function diskChildren(dir) {
+  let ents = [];
+  try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return [{ kind: 'info', label: 'Not found on disk' }]; }
+  return ents.filter((d) => d.name !== '.git')
+    .sort((a, b) => (Number(b.isDirectory()) - Number(a.isDirectory())) || byName(a.name, b.name))
+    .map((d) => ({ kind: 'disk', path: path.join(dir, d.name), dir: d.isDirectory() }));
+}
+
+function diskTreeItem(vs, node) {
+  const it = new vs.TreeItem(path.basename(node.path), node.dir ? vs.TreeItemCollapsibleState.Collapsed : vs.TreeItemCollapsibleState.None);
+  it.resourceUri = vs.Uri.file(node.path);
+  it.contextValue = node.dir ? 'disk-dir' : 'disk-file';
+  if (!node.dir) it.command = { command: 'vscode.open', title: 'Open', arguments: [it.resourceUri] };
+  return it;
+}
+
 class GannetTree {
   constructor({ vscode, accounts, clientFor, recent, local }) {
     Object.assign(this, { vscode, accounts, clientFor, recent, local });
@@ -94,13 +111,7 @@ class GannetTree {
     return out;
   }
 
-  diskDir(dir) {
-    let ents = [];
-    try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return [{ kind: 'info', label: 'Not found on disk' }]; }
-    return ents.filter((d) => d.name !== '.git')
-      .sort((a, b) => (Number(b.isDirectory()) - Number(a.isDirectory())) || byName(a.name, b.name))
-      .map((d) => ({ kind: 'disk', path: path.join(dir, d.name), dir: d.isDirectory() }));
-  }
+  diskDir(dir) { return diskChildren(dir); }
 
   errorNode(e, node) {
     const account = node && node.account;
@@ -162,13 +173,7 @@ class GannetTree {
         it.iconPath = vs.ThemeIcon.File || new vs.ThemeIcon('file');
         return it;
       }
-      case 'disk': {
-        const it = new vs.TreeItem(path.basename(node.path), node.dir ? S.Collapsed : S.None);
-        it.resourceUri = vs.Uri.file(node.path);
-        it.contextValue = node.dir ? 'disk-dir' : 'disk-file';
-        if (!node.dir) it.command = { command: 'vscode.open', title: 'Open', arguments: [it.resourceUri] };
-        return it;
-      }
+      case 'disk': return diskTreeItem(vs, node);
       case 'info': {
         const it = new vs.TreeItem(node.label, S.None);
         it.contextValue = 'info';
@@ -193,4 +198,4 @@ class GannetTree {
   }
 }
 
-module.exports = { GannetTree, LARGE };
+module.exports = { GannetTree, LARGE, diskChildren, diskTreeItem, byName };
