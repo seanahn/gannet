@@ -4,7 +4,7 @@
 // folder at a time, until it is checked out, and from disk after. Errors show as items in place of what failed.
 const fs = require('fs');
 const path = require('path');
-const { isDir } = require('./localRepos.js');
+const { labelOf, tilde } = require('./workspaces.js');
 const { toUri } = require('./fsProvider.js');
 
 const LARGE = 10 * 1024 * 1024;
@@ -59,6 +59,7 @@ class GannetTree {
         case 'group': return await this.everyRepo(node);
         case 'repo': return await this.repoChildren(node);
         case 'entry': return await this.remoteDir(node.account, node.repo, node.entry.path);
+        case 'checkout': return this.diskDir(node.checkout.path);
         case 'disk': return this.diskDir(node.path);
         default: return [];
       }
@@ -138,11 +139,12 @@ class GannetTree {
     return (await this.fullList(node.account.login)).filter((r) => same(r.owner, node.owner)).map((repo) => ({ kind: 'repo', account: node.account, repo }));
   }
 
-  localOf(repo) { return this.local.checkoutsOf(repo.fullName)[0] || null; }
+  checkouts(repo) { return this.local.checkoutsOf(repo.fullName); }
 
   async repoChildren(node) {
-    const here = this.localOf(node.repo);
-    if (here) return this.diskDir(here.path);
+    const copies = this.checkouts(node.repo);
+    if (copies.length === 1) return this.diskDir(copies[0].path);
+    if (copies.length > 1) return copies.map((checkout) => ({ kind: 'checkout', account: node.account, repo: node.repo, checkout }));
     await this.recent.touch(node.account.login, node.repo.fullName);
     try {
       return await this.remoteDir(node.account, node.repo, '');
@@ -212,12 +214,25 @@ class GannetTree {
         return it;
       }
       case 'repo': {
-        const it = new vs.TreeItem(node.repo.name, S.Collapsed);
-        const l = this.localOf(node.repo);
-        it.description = [l && '● local', node.repo.private && 'private', node.repo.archived && 'archived'].filter(Boolean).join(' · ');
-        it.contextValue = !l ? 'repo-remote' : l.login ? 'repo-local' : 'repo-local-foreign';
-        it.tooltip = l ? `${node.repo.fullName}\n${l.path}${l.login ? `\npushes as ${l.login}` : ''}` : `${node.repo.fullName} — only on GitHub`;
-        it.iconPath = new vs.ThemeIcon(l ? 'repo-clone' : 'github-alt');
+        const { repo } = node;
+        const it = new vs.TreeItem(repo.name, S.Collapsed);
+        const copies = this.checkouts(repo);
+        const list = this.workspaces ? this.workspaces.list() : [];
+        const places = [...new Set(copies.map((c) => labelOf(c.path, list, this.home)))];
+        it.description = [repo.private && 'private', repo.archived && 'archived', ...places].filter(Boolean).join(' · ');
+        it.contextValue = !copies.length ? 'repo-remote' : copies.length > 1 ? 'repo-multi' : copies[0].login ? 'repo-local' : 'repo-local-foreign';
+        it.tooltip = !copies.length ? `${repo.fullName} — only on GitHub`
+          : [repo.fullName, ...copies.map((c) => `${c.path}${c.login ? ` (pushes as ${c.login})` : ''}`)].join('\n');
+        it.iconPath = copies.length ? new vs.ThemeIcon('github-alt', new vs.ThemeColor('charts.green')) : new vs.ThemeIcon('github-alt');
+        return it;
+      }
+      case 'checkout': {
+        const c = node.checkout;
+        const it = new vs.TreeItem(tilde(c.path, this.home), S.Collapsed);
+        it.contextValue = c.login ? 'checkout-local' : 'checkout-local-foreign';
+        it.tooltip = `${c.path}${c.login ? `\npushes as ${c.login}` : ''}`;
+        it.resourceUri = vs.Uri.file(c.path);
+        it.iconPath = vs.ThemeIcon.Folder;
         return it;
       }
       case 'entry': {

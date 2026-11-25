@@ -155,6 +155,38 @@ const S = vscode.TreeItemCollapsibleState;
     await local.remember('c3-e/hub', { path: dir, login: null, byGannet: false });
     assert.strictEqual(item(hubLocal).contextValue, 'repo-local-foreign');
 
+    // several checkouts: green, the workspaces they are in, one node per checkout
+    {
+      const gws = path.join(home, 'github'), other = path.join(tmp, 'git');
+      await workspaces.add(gws); await workspaces.add(other);
+      const p1 = path.join(gws, 'perch'), p2 = path.join(other, 'perch');
+      for (const p of [p1, p2]) { fs.mkdirSync(path.join(p, '.git'), { recursive: true }); fs.writeFileSync(path.join(p, 'f.txt'), 'x'); }
+      await local.remember('seanahn/perch', { path: p1, login: 'seanahn', byGannet: true });
+      await local.remember('seanahn/perch', { path: p2, login: null, byGannet: false });
+      const perch = { kind: 'repo', account: accountList[1], repo: R('seanahn/perch', { private: true }) };
+      const it = item(perch);
+      assert.strictEqual(it.description, `private · ~/github · ${other}`);
+      assert.strictEqual(it.iconPath.id, 'github-alt');
+      assert.strictEqual(it.iconPath.color.id, 'charts.green');
+      assert.strictEqual(it.contextValue, 'repo-multi');
+      const copies = await tree.getChildren(perch);
+      assert.deepStrictEqual(copies.map((n) => item(n).label), ['~/github/perch', p2]);
+      assert.deepStrictEqual(copies.map((n) => item(n).contextValue), ['checkout-local', 'checkout-local-foreign']);
+      assert.strictEqual(item(copies[0]).tooltip, `${p1}\npushes as seanahn`);
+      assert.strictEqual(item(copies[0]).collapsibleState, S.Collapsed);
+      assert.deepStrictEqual((await tree.getChildren(copies[1])).map((n) => item(n).label), ['f.txt']);
+      // one left: it is the repo's checkout again
+      fs.rmSync(p1, { recursive: true });
+      assert.strictEqual(item(perch).contextValue, 'repo-local-foreign');
+      assert.strictEqual(item(perch).description, `private · ${other}`);
+      assert.deepStrictEqual((await tree.getChildren(perch)).map((n) => item(n).label), ['f.txt']);
+      // a checkout outside every workspace shows the folder it sits in
+      const lone = path.join(tmp, 'elsewhere', 'perch');
+      fs.mkdirSync(lone, { recursive: true });
+      await local.remember('seanahn/perch', { path: lone });
+      assert.strictEqual(item(perch).description, `private · ${other} · ${path.join(tmp, 'elsewhere')}`);
+    }
+
     // Review Focus 2: an owner spelled two ways is one node
     {
       const lists = { x: { orgs: ['c3-e'], pushed: [R('C3-E/up')], all: [] } };
