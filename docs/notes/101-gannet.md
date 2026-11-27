@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) designed, not built. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -409,6 +409,119 @@ GANNET                               [+ account] [⟳]
    |-- expand(id) for each remembered expanded row ...          |
    |-- expand(id) fails -------|                                |
    |<- rows(id) = [error row] -|  (signed out, rate limit, 404: shown in place of the children, as 0.3.0) |
+```
+
+## New folders not on GitHub yet (0.5.0)
+
+A repo often starts before it is on GitHub. For work repos only the git admins can create the GitHub repo, so you
+work in a local folder until it is ready, and it may never be pushed at all. *(Sean)* Most people make that folder
+by asking Claude; some will want to do it by hand from the workspace panel. *(Sean: "some ppl may want to do it
+manually from the workspaces links in the gannet explorer")* Either way the folder should sit under the org it is
+meant for. *(Sean: "visually the new folder should sit under one org, right?")*
+
+```
+GANNET                               [+ account] [⟳]
+  ~/github                   [+📁] [📂] [✕]          (buttons show on hover)
+  + Add folder…
+ ───────────────────────────────────────────────
+ ▾ (org) c3-e                via c3-sahn
+   ▾ (dim cat) newthing      not on GitHub yet · ~/github
+       (file) notes.md
+   ▸ (cat) c3nexus           private
+   ▸ (two cats) All repos    312
+```
+
+### What it is
+
+- **New Folder…** is a new hover button on each workspace directory in the panel (not on a Missing one). It asks
+  for a name, then which owner the folder is for, creates `<workspace>/<name>`, and shows it under that owner.
+  *(Sean)*
+  - The name is one folder name: not empty, no `/` or `\`, not `.` or `..`. The input box says what is wrong and
+    lets you fix it. *(builder's call)*
+  - **A folder of that name already there** (one Claude made, say) is adopted instead of created: the input box
+    says `<name> exists: it will be put under an owner`, and the rest is the same, with no mkdir. A file of that
+    name, a folder whose `origin` is already a GitHub repo, or one already recorded is refused with a message
+    saying so. *(Sean chose adoption over listing unplaced folders: most new folders are made by asking Claude)*
+  - The owner is picked from the owner rows the sidebar shows now, labelled as they are (`c3-e  via c3-sahn`);
+    hidden accounts and owners are not offered. Escape at either question creates nothing. *(builder's call)*
+  - The new folder is added to this window, as a checkout is, unless it already sits inside one of the window's
+    folders (seclab's `~`). No new window opens. *(builder's call; Sean did not object)*
+- **Gannet touches nothing in the folder:** no `git init`, no remote, no GitHub repo. It keeps its own record,
+  per machine like the workspace list: the folder's path, and the owner row it was put under (the owner and the
+  account it is reached through, as `c3-e via c3-sahn` is one row and `c3-e via seanahn` another). The record is
+  written before the folder is added to the window, since adding a folder can restart the extension. *(Sean chose this: "since we do not even know if the local repo will ever be pushed to remote")*
+- **The row:** first under its owner, before the recent repos. Label: the folder name. Description: `not on
+  GitHub yet · <workspace>`. Tooltip: the folder's path, and its branch if it is a git repo. Icon: the cat, dimmed
+  (the description colour). It expands to the folder's files on disk, as a checkout does. The record keeps its
+  own path: removing the workspace from the list does not drop it, and the description then shows the folder's
+  parent (`~/old`). *(builder's calls,
+  Sean agreed to the shape)*
+- **Right-click** on it: Reveal, Add to Window, **Move to Owner…**, **Forget**. *(Sean)*
+
+### Moving it to another org
+
+- **Drag and drop:** a "not on GitHub yet" row can be dragged onto any owner row; owner rows highlight while it is
+  over them, and dropping there moves it. Nothing else in the sidebar is draggable or a drop target. *(Sean: "maybe
+  drag and drop or a new icon?", then "yes" to both ways)*
+- **Move to Owner…** (right-click): the same quick pick of owners, for the keyboard and for an owner scrolled far
+  away. *(Sean)*
+- Moving changes only Gannet's record (the owner and its account, from the row dropped on or picked); the folder
+  stays where it is on disk. Dropping on its own row does nothing. *(builder's call)*
+- **Forget** removes the record and the row, and leaves the folder on disk. *(Sean: "yes")*
+- Repos that are on GitHub cannot be moved: their owner is GitHub's. *(builder's call)*
+
+### When it reaches GitHub
+
+- Gannet reads a recorded folder's `origin` each time it draws the folder's owner, expanded by hand or at start.
+  - **No GitHub origin:** the dim row, as above.
+  - **Origin `github.com/<owner>/<repo>`, but GitHub does not list that repo for any account yet** (no admin has
+    created it, or the lists are older than it): the dim row stays, its description becoming `<owner>/<repo>, not
+    on GitHub yet`. The folder never disappears from the sidebar while it waits. *(builder's call)*
+  - **Origin listed by GitHub** (in an account's recently pushed or kept All repos list): the record is dropped and
+    the folder is remembered as a checkout of that repo, so it shows as a normal green checkout under the remote's
+    owner, as a repo you cloned yourself does, and the whole sidebar redraws so every row of that owner shows it.
+    If the remote's owner is not the recorded one, it moves there by itself: GitHub is right. *(builder's call:
+    "it will show up in the repos nodes", Sean)*
+  - The checkout gets no push account and nothing is written to its `.git/config`: like a repo cloned by hand, it
+    offers **Push as This Account**. *(builder's call: Gannet touches nothing in the folder)*
+- A recorded folder that is gone from disk is dropped from the record quietly, as a missing checkout is.
+  *(builder's call)*
+- If its owner row is not shown (account hidden or signed out, owner hidden), the row is not shown either; the
+  record is kept and the row comes back with the owner. *(builder's call)*
+- A GitHub repo of the same name under the same owner is a different row until the folder's `origin` points at it.
+  *(builder's call)*
+- After ⟳ the next All repos opening fetches the lists again, so a repo an admin just created is found then.
+- **⟳ also rescans the workspace directories** for clones, so a folder whose remote you have just set turns green
+  without reloading the window. Today they are scanned only on start. *(builder's call; Sean did not object)*
+
+### Not in this version
+
+- Creating the GitHub repo, `git init`, setting a remote, or pushing. *(Sean: only admins can create work repos)*
+- New Folder… from an owner's right-click (asking for the workspace instead). Moving a folder on disk. Listing
+  every unplaced folder of a workspace.
+- Other windows on the same machine read the same record but are not told of a change; they show it at their
+  next redraw. *(builder's call)*
+
+```
+ Page (webview)            Extension                         Disk / settings
+   |-- ws newFolder(path) ->|                                   |
+   |                        |-- input: name (validated) ------->|  Escape: nothing
+   |                        |   exists? adopt; file/GitHub clone/recorded: refused
+   |                        |-- quick pick: owner row           |  Escape: nothing
+   |                        |-- mkdir <ws>/<name> (unless adopted) ->|
+   |                        |-- record {path, owner, account} ->|  (before the window changes)
+   |                        |-- add to window (unless inside one; refused: the checkout's note)
+   |<- reset; rows ---------|  (owner shows the new row first)  |
+   |-- drag row onto owner row, or right-click Move to Owner… -> quick pick
+   |   move(id, ownerRowId) |-- record.{owner, account} = target row ->|
+   |   right-click Forget   |-- record removed (folder kept) -->|
+   |<- reset; rows ---------|                                   |
+   |-- expand owner (or drawn open) ->|-- origin of each recorded folder ->|
+   |                        |   none: dim row; c3-e/newthing not listed: dim row, "c3-e/newthing, not on GitHub yet"
+   |                        |   listed: drop record, remember as a checkout of c3-e/newthing
+   |<- reset; rows: green c3-e/newthing under c3-e, everywhere c3-e shows
+   |   (mkdir fails: name taken since the check, no permission: an error message, no record, nothing added)
+   |   (folder gone from disk: record dropped quietly, no row)
 ```
 
 ## Checkout
