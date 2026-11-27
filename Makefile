@@ -17,7 +17,7 @@ VSIX = gannet-$(VERSION).vsix
 
 EXT_ID = seanahn.gannet-$(VERSION)
 # links made under earlier versions
-OLD_IDS = seanahn.gannet-0.1.0 seanahn.gannet-0.2.0 seanahn.gannet-0.3.0 seanahn.gannet-0.4.0 seanahn.gannet-0.4.1 seanahn.gannet-0.4.2
+OLD_IDS = seanahn.gannet-0.1.0 seanahn.gannet-0.2.0 seanahn.gannet-0.3.0 seanahn.gannet-0.4.0 seanahn.gannet-0.4.1 seanahn.gannet-0.4.2 seanahn.gannet-0.5.0
 EXT_DIRS = /home/sahn/.vscode/extensions /home/sahn/.local/share/code-server/extensions /home/sahn/.vscode-server/extensions
 
 ## Install runtime dependencies (there are none; kept so `install` stays the same)

@@ -125,6 +125,12 @@ const { GannetSidebar } = require('../src/sidebar.js');
         await v._send({ type: 'checkName', path: '/w', name });
         assert.deepStrictEqual(v._posted.at(-1), { type: 'nameCheck', path: '/w', name, message, error });
       }
+      await v._send({ type: 'act', act: 'hideOwner', id: rA.id });
+      assert.deepStrictEqual([rec.executed.at(-1).id, rec.executed.at(-1).args[0]], ['gannet.hideOwner', ownerA], 'the eye on an owner row');
+      const ranEye = rec.executed.length;
+      await v._send({ type: 'act', act: 'hideOwner', id: rNf.id });
+      await v._send({ type: 'act', act: 'hideOwner', id: 'nope' });
+      assert.strictEqual(rec.executed.length, ranEye, 'only an owner row hides');
       await v._send({ type: 'move', id: rNf.id, to: rB.id });
       assert.strictEqual(rec.executed.at(-1).id, 'gannet.moveNewFolder');
       assert.strictEqual(rec.executed.at(-1).args[0], nfNode);

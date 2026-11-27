@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -368,7 +368,8 @@ GANNET                               [+ account] [⟳]
   already checked out it is **Check Out Another Copy**, which runs the same Check Out: the quick pick of workspaces,
   with the next free folder name and Other folder…. *(Sean: "even if the repo is already checked out, the checkout
   icon should show up to checkout as a different folder"; 0.4.0 first had it only on repos not checked out)*
-- **Hide Owner** (right-click an organization or another owner, the rows shown `via <account>`) leaves that owner
+- **Hide Owner** (a closed-eye button on hover, *Sean: "can we have an eye icon instead?"*, or right-click; on an
+  organization or another owner, the rows shown `via <account>`) leaves that owner
   out under every account, matched without case, and adds it to the `gannet.hiddenOwners` setting; editing the
   setting brings it back. An account's own login is not an owner to hide: **Hide Account** does that. *(Sean: "add
   a way to hide for example bpmn2"; builder's calls on the setting and its scope)*

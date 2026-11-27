@@ -80,6 +80,11 @@ assert.ok(op.includes('<div class="hint info">Put newthing under…</div>'));
 assert.ok(op.indexOf('data-i="1"') < op.indexOf('data-path="/w"'), 'under its own row');
 assert.ok(P.workspacesHtml(two, { path: '/git', name: 'n', step: 'owner', owners: [], sel: 0 }).includes('<div class="hint error">'), 'no owner to put it under');
 assert.ok(P.workspacesHtml(two, { path: '/git', name: 'n', step: 'owner', owners: null, sel: 0 }).includes('Loading owners'), 'while they are read');
+// an owner row (not your own account) hides with the eye on hover; nothing else has it
+const ownerRow = { id: 'o:seanahn:bpmn2', label: 'bpmn2', hasChildren: true, contextValue: 'owner' };
+assert.ok(P.rowHtml(ownerRow, 0, {}).includes(`<span class="acts"><button class="act" data-act="hideOwner" title="Hide Owner">${P.ICONS['eye-closed']}</button></span>`));
+assert.ok(P.ICONS['eye-closed'].startsWith('<svg'));
+for (const cv of ['account-vscode', 'account-gh', 'repo-remote', 'newfolder', 'group-all']) assert.ok(!P.rowHtml({ id: 'x', label: 'x', contextValue: cv }, 0, {}).includes('hideOwner'), cv);
 const nfRow = { id: 'o:c3-sahn:c3-e/n:/w/x', label: 'x', hasChildren: true, contextValue: 'newfolder', icon: { id: 'github-alt', color: 'descriptionForeground' } };
 const ownerE = { id: 'o:c3-sahn:c3-e', label: 'c3-e', hasChildren: true, contextValue: 'owner' };
 const ownerS = { id: 'o:seanahn:seanahn', label: 'seanahn', hasChildren: true, contextValue: 'account-vscode' };

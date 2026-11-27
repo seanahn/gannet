@@ -25,6 +25,7 @@
     close: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
     add: svg('<path d="M8 3v10M3 8h10"/>'),
     'new-folder': svg('<path d="M1.5 3.5h4l1.5 1.5h7.5v8h-13z"/><path d="M8 7.5v4M6 9.5h4"/>'),
+    'eye-closed': svg('<path d="M1.5 5c1.6 2 3.8 3 6.5 3s4.9-1 6.5-3"/><path d="M3.5 7.1L2.3 8.8M6.2 7.9l-.5 2M9.8 7.9l.5 2M12.5 7.1l1.2 1.7"/>'),
     loading: svg('<path d="M8 2a6 6 0 106 6"/>'),
   };
   // All repos: two of the codicon cats, one behind and above the other
@@ -56,6 +57,7 @@
       + `<span class="tw">${twistie}</span>${row.hasChildren ? iconHtml(row.icon) : ''}`
       + `<span class="label">${esc(row.label)}</span>${row.description ? `<span class="desc">${esc(row.description)}</span>` : ''}`
       + (/^repo-/.test(row.contextValue || '') ? `<span class="acts"><button class="act" data-act="checkout" title="${row.contextValue === 'repo-remote' ? 'Check Out' : 'Check Out Another Copy'}">${ICONS.cloud}</button></span>` : '')
+      + (row.contextValue === 'owner' ? `<span class="acts"><button class="act" data-act="hideOwner" title="Hide Owner">${ICONS['eye-closed']}</button></span>` : '')
       + '</div>';
   }
 
