@@ -63,7 +63,7 @@
       + '</div>';
   }
 
-  /** The workspace panel: one row per directory with its hover buttons, then Add folder…. While a new folder is
+  /** The workspace panel: one row per directory with New Folder… always shown and its hover buttons, then Add Workspace…. While a new folder is
    *  being named, its name box (and the check's message) sits under that directory's row, as Explorer's does. */
   function workspacesHtml(items, naming = null) {
     const picking = naming && naming.step === 'owner';
@@ -75,11 +75,12 @@
       : `<div class="ws naming"><span class="lic">${ICONS['new-folder']}</span><input class="name" type="text" spellcheck="false" value="${esc(naming.name)}"${picking ? ' readonly' : ''} aria-label="New folder name"></div>`
         + (picking ? choices() : naming.message ? `<div class="hint ${naming.error ? 'error' : 'info'}">${esc(naming.message)}</div>` : ''));
     return items.map((w) => `<div class="ws${w.missing ? ' missing' : ''}" data-path="${esc(w.path)}" title="${esc(w.path)}">`
-      + `<span class="label">${esc(w.label)}</span>${w.missing ? '<span class="desc">Missing</span>' : ''}<span class="acts">`
-      + (w.missing ? '' : `<button class="act" data-act="newFolder" title="New Folder…">${ICONS['new-folder']}</button>`)
+      + `<span class="label">${esc(w.label)}</span>${w.missing ? '<span class="desc">Missing</span>' : ''}`
+      + (w.missing ? '' : `<span class="keep"><button class="act" data-act="newFolder" title="New Folder…">${ICONS['new-folder']}</button></span>`)
+      + '<span class="acts">'
       + (w.missing || !w.reveal ? '' : `<button class="act" data-act="reveal" title="Reveal">${ICONS['folder-opened']}</button>`)
       + `<button class="act" data-act="remove" title="Remove from List">${ICONS.close}</button></span></div>` + box(w)).join('')
-      + `<div class="ws add" data-act="add" title="Add a folder Gannet checks repos out into"><span class="lic">${ICONS.add}</span><span class="label">Add folder…</span></div>`;
+      + `<div class="ws add" data-act="add" title="Add a directory you keep repos in to this list"><span class="lic">${ICONS.add}</span><span class="label">Add Workspace…</span></div>`;
   }
 
   /** The rows on screen, depth first: an open parent's children once they have arrived. */
@@ -138,7 +139,7 @@
     const input = $ws.querySelector('input.name');
     const had = input && document.activeElement === input ? [input.selectionStart, input.selectionEnd] : null;
     if (naming && !wsItems.some((w) => w.path === naming.path && !w.missing)) naming = null;   // its directory went
-    $ws.innerHTML = wsIn ? workspacesHtml(wsItems, naming) : '';   // not a lone Add folder… before the list comes
+    $ws.innerHTML = wsIn ? workspacesHtml(wsItems, naming) : '';   // not a lone Add Workspace… before the list comes
     const box = $ws.querySelector('input.name');
     if (box && (had || naming.focus)) { box.focus(); if (had) box.setSelectionRange(had[0], had[1]); naming.focus = false; }
   }

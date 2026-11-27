@@ -28,7 +28,14 @@ const ws = P.workspacesHtml([{ path: '/git', label: '/git', missing: false, reve
   { path: '/old', label: '~/old', missing: true, reveal: false }]);
 assert.strictEqual((ws.match(/data-act="reveal"/g) || []).length, 1);
 assert.strictEqual((ws.match(/data-act="remove"/g) || []).length, 3);
-assert.ok(ws.includes('Missing') && ws.includes('Add folder…'));
+assert.ok(ws.includes('Missing') && ws.includes('<span class="label">Add Workspace…</span>'), 'adds a directory to the list, not a folder (Sean)');
+assert.ok(!ws.includes('Add folder'));
+// New Folder is always shown, not only on hover: its own span outside the hover buttons
+{
+  const row = ws.split('<div class="ws')[1];
+  assert.ok(/<span class="keep"><button class="act" data-act="newFolder"/.test(row), row);
+  assert.ok(!/<span class="acts">[^]*data-act="newFolder"/.test(row), 'not among the hover buttons');
+}
 // visible rows and keys
 const R = (id, hasChildren = true) => ({ id, label: id, hasChildren });
 const kids = new Map([['a', [R('a/1', false), R('a/2')]], ['a/2', [R('a/2/x', false)]]]);

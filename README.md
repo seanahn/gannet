@@ -13,7 +13,7 @@ repos, grouped by owner, below.
 GITHUB                               [+ account] [⟳]
   /git                                  [📂] [✕]     (buttons show on hover)
   ~/github                              [📂] [✕]
-  + Add folder…
+  + Add Workspace…
  ───────────────────────────────────────────────
  ▾ (org) c3-e                via c3-sahn
    ▸ (cat) c3nexus           ~
@@ -50,8 +50,8 @@ GITHUB                               [+ account] [⟳]
 ## Workspaces
 
 The panel on top lists the directories you keep checkouts in on this machine, such as `/git` and `~/github`
-locally or `~/` on a remote machine. **Add folder…** adds a directory (not a repo itself); hovering a directory
-shows **Reveal** and **Remove from List**, which forgets it and deletes nothing. Reveal shows the directory in the
+locally or `~/` on a remote machine. **Add Workspace…** adds a directory to the list (not a repo itself). Each
+directory always shows **New Folder…**; hovering it also shows **Reveal** and **Remove from List**, which forgets it and deletes nothing. Reveal shows the directory in the
 Explorer when it is in this window, else in your file manager; in a remote window, where there is no file manager,
 a directory outside the window has no Reveal. A directory that
 is gone shows **Missing**. Each machine has its own list, and every listed directory is scanned on start for

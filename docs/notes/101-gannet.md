@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye, a Hidden row to show them again) built, 2026-11-27; 0.5.2 (a spinning Loading repos… row until the first rows come, no lone Add folder… before the workspace list, no "private", a smaller eye) built, 2026-11-27. 0.5.3 (the sidebar titled GitHub) built, 2026-11-27; 0.5.4 (the cat in the activity bar) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye, a Hidden row to show them again) built, 2026-11-27; 0.5.2 (a spinning Loading repos… row until the first rows come, no lone Add folder… before the workspace list, no "private", a smaller eye) built, 2026-11-27. 0.5.3 (the sidebar titled GitHub) built, 2026-11-27; 0.5.4 (the cat in the activity bar) built, 2026-11-27; 0.5.5 (New Folder… always shown, Add Workspace…) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -308,7 +308,7 @@ GITHUB                               [+ account] [⟳]
   /git                                  [📂] [✕]     (buttons show on hover)
   ~/github                              [📂] [✕]
   ~/old                     Missing           [✕]
-  + Add folder…
+  + Add Workspace…
  ───────────────────────────────────────────────
  ▸ (org) bpmn2               via seanahn
  ▾ (org) c3-e                via c3-sahn
@@ -331,7 +331,9 @@ GITHUB                               [+ account] [⟳]
 - **On top, the workspace directories** as a small configuration panel, not a tree: one row per directory (`~` for
   home, full path as tooltip), with **Reveal** and **✕ Remove from list** buttons
   that show on hover, **Missing** on a directory that is gone (Reveal is not offered there), and an **Add folder…**
-  row at the end. A thin line separates it from the owners. *(Sean: "a little configuration panel on top")* The
+  row at the end. *(0.5.5: **New Folder…** is always shown, the hover buttons keep their place so it never
+  moves, and the last row reads **Add Workspace…**; Sean: "being able to add a new folder to a workspace is not
+  obvious" and "the add a new folder that's shown is to add another workspace, right?")* A thin line separates it from the owners. *(Sean: "a little configuration panel on top")* The
   rules are 0.3.0's: a git repo is refused, removing deletes nothing, the list is per machine. *(builder's calls on
   the layout)*
 - **Reveal** shows the directory in VS Code's Explorer when it is one of the window's folders or inside one (seclab's
@@ -433,7 +435,7 @@ meant for. *(Sean: "visually the new folder should sit under one org, right?")*
 ```
 GITHUB                               [+ account] [⟳]
   ~/github                   [+📁] [📂] [✕]          (buttons show on hover)
-  + Add folder…
+  + Add Workspace…
  ───────────────────────────────────────────────
  ▾ (org) c3-e                via c3-sahn
    ▾ (dim cat) newthing      not on GitHub yet · ~/github
@@ -654,7 +656,7 @@ Rulings settled while planning the build, all builder's calls:
     endings, so the lines it does not touch stay as they were.
   - A new window resumes only the checkouts whose window is gone, so opening a workspace while a checkout runs
     does not start it twice. An extension-host restart is a new process, so its cut-off checkouts are resumed.
-  - **Add folder…** refuses a folder that is itself a git repo, so Check out never clones inside a repo.
+  - **Add Workspace…** refuses a folder that is itself a git repo, so Check out never clones inside a repo.
   - On a workspace: an inline **Open in new window** button; **Open here** is not offered on this window's own
     workspace; **Set repo folder…** only on workspace files.
   - Workspace files are edited with `jsonc-parser` (`modify` + `applyEdits`), Gannet's one runtime dependency,

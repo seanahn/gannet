@@ -24,6 +24,10 @@ const CSS = `
   @keyframes spin { to { transform: rotate(360deg); } }
   .acts { margin-left: auto; display: none; padding-left: 4px; }
   .ws:hover .acts, .row:hover .acts { display: inline-flex; }
+  .ws .keep { margin-left: auto; display: inline-flex; padding-left: 4px; }
+  /* a workspace's hover buttons keep their place, so New Folder never moves under the pointer */
+  .ws .keep + .acts { margin-left: 0; padding-left: 0; display: inline-flex; visibility: hidden; }
+  .ws:hover .keep + .acts { visibility: visible; }
   .act { background: none; border: 0; color: inherit; padding: 2px; margin: 0; cursor: pointer; display: inline-flex; border-radius: 3px; }
   .act:hover { background: var(--vscode-list-hoverBackground); }
   .ws.naming { cursor: default; }
