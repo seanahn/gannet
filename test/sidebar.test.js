@@ -106,17 +106,28 @@ const { GannetSidebar } = require('../src/sidebar.js');
       const ownerB = { kind: 'owner', owner: 'seanahn', account: { login: 'seanahn' }, own: true };
       const nfNode = { kind: 'newFolder', owner: 'c3-e', account: ownerA.account, rec: { path: '/w/x', owner: 'c3-e', account: 'c3-sahn' }, pending: null };
       const repoNode = { kind: 'repo', account: ownerA.account, repo: { fullName: 'c3-e/hub', name: 'hub' } };
+      const hiddenG = { kind: 'hidden' }, hOwner = { kind: 'hiddenOwner', owner: 'bpmn2' }, hAccount = { kind: 'hiddenAccount', login: 'old' };
       const small = {
         onDidChangeTreeData: () => {},
-        getTreeItem: (n) => ({ label: n.owner || (n.rec && 'x') || n.repo.name, collapsibleState: n.kind === 'owner' ? 1 : 0, contextValue: n.kind === 'owner' ? 'owner' : n.kind === 'newFolder' ? 'newfolder' : 'repo-remote' }),
-        getChildren: async (n) => (!n ? [ownerA, ownerB] : n === ownerA ? [nfNode, repoNode] : []),
+        getTreeItem: (n) => ({ label: n.owner || n.login || (n.rec && 'x') || (n.repo && n.repo.name) || 'Hidden', collapsibleState: n.kind === 'owner' || n.kind === 'hidden' ? 1 : 0,
+          contextValue: { owner: 'owner', newFolder: 'newfolder', hidden: 'group-hidden', hiddenOwner: 'hidden-owner', hiddenAccount: 'hidden-account' }[n.kind] || 'repo-remote' }),
+        getChildren: async (n) => (!n ? [ownerA, ownerB, hiddenG] : n === ownerA ? [nfNode, repoNode] : n === hiddenG ? [hOwner, hAccount] : []),
         owners: async () => [ownerA, ownerB],
       };
       const sb = new GannetSidebar({ vscode, tree: small, workspaces: fx.workspaces, home: fx.home, extensionUri: vscode.Uri.file('/ext'), checkName: (dir, name) => (name === '..' ? { ok: false, message: 'no' } : name === 'old' ? { ok: true, adopt: true } : { ok: true, adopt: false }) });
       vscode.window.registerWebviewViewProvider('gannet.dnd', sb);
       const v = vscode._resolveView('gannet.dnd');
       await v._send({ type: 'ready' });
-      const [rA, rB] = v._posted.at(-1).rows;
+      const [rA, rB, rH] = v._posted.at(-1).rows;
+      await v._send({ type: 'expand', id: rH.id });
+      const [rHo, rHa] = v._posted.at(-1).rows;
+      await v._send({ type: 'act', act: 'show', id: rHo.id });
+      assert.deepStrictEqual([rec.executed.at(-1).id, rec.executed.at(-1).args[0]], ['gannet.showOwner', hOwner]);
+      await v._send({ type: 'act', act: 'show', id: rHa.id });
+      assert.deepStrictEqual([rec.executed.at(-1).id, rec.executed.at(-1).args[0]], ['gannet.showAccount', hAccount]);
+      const ranShow = rec.executed.length;
+      await v._send({ type: 'act', act: 'show', id: rA.id });
+      assert.strictEqual(rec.executed.length, ranShow, 'show only on a hidden row');
       await v._send({ type: 'expand', id: rA.id });
       const [rNf, rRepo] = v._posted.at(-1).rows;
       await v._send({ type: 'listOwners' });

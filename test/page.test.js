@@ -85,6 +85,10 @@ const ownerRow = { id: 'o:seanahn:bpmn2', label: 'bpmn2', hasChildren: true, con
 assert.ok(P.rowHtml(ownerRow, 0, {}).includes(`<span class="acts"><button class="act" data-act="hideOwner" title="Hide Owner">${P.ICONS['eye-closed']}</button></span>`));
 assert.ok(P.ICONS['eye-closed'].startsWith('<svg'));
 for (const cv of ['account-vscode', 'account-gh', 'repo-remote', 'newfolder', 'group-all']) assert.ok(!P.rowHtml({ id: 'x', label: 'x', contextValue: cv }, 0, {}).includes('hideOwner'), cv);
+// a hidden owner or account comes back with the open eye
+assert.ok(P.rowHtml({ id: 'hidden/h:bpmn2', label: 'bpmn2', contextValue: 'hidden-owner' }, 1, {}).includes(`<button class="act" data-act="show" title="Show Owner">${P.ICONS.eye}</button>`));
+assert.ok(P.rowHtml({ id: 'hidden/a:x', label: 'x', contextValue: 'hidden-account' }, 1, {}).includes('data-act="show" title="Show Account"'));
+assert.ok(P.ICONS.eye.startsWith('<svg') && P.ICONS.eye !== P.ICONS['eye-closed']);
 const nfRow = { id: 'o:c3-sahn:c3-e/n:/w/x', label: 'x', hasChildren: true, contextValue: 'newfolder', icon: { id: 'github-alt', color: 'descriptionForeground' } };
 const ownerE = { id: 'o:c3-sahn:c3-e', label: 'c3-e', hasChildren: true, contextValue: 'owner' };
 const ownerS = { id: 'o:seanahn:seanahn', label: 'seanahn', hasChildren: true, contextValue: 'account-vscode' };

@@ -38,8 +38,9 @@ const checkoutLine = (c) => [c.path, branchOf(c.path), c.login && `pushes as ${c
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();   // GitHub names ignore case
 
 class GannetTree {
-  constructor({ vscode, accounts, clientFor, recent, local, cache, workspaces, home, hiddenOwners = () => [], newFolders = null }) {
+  constructor({ vscode, accounts, clientFor, recent, local, cache, workspaces, home, hiddenOwners = () => [], hiddenAccounts = () => [], newFolders = null }) {
     this.hiddenOwners = hiddenOwners;
+    this.hiddenAccounts = hiddenAccounts;
     this.newFolders = newFolders;
     Object.assign(this, { vscode, accounts, clientFor, recent, local, cache, workspaces, home });
     this.changed = new vscode.EventEmitter();
@@ -63,8 +64,9 @@ class GannetTree {
 
   async getChildren(node) {
     try {
-      if (!node) return await this.owners();
+      if (!node) { const owners = await this.owners(); return this.hiddenList().length ? [...owners, { kind: 'hidden' }] : owners; }
       switch (node.kind) {
+        case 'hidden': return this.hiddenList();
         case 'owner': return node.error ? [this.errorNode(node.error, node)] : await this.ownerChildren(node);
         case 'group': return await this.everyRepo(node);
         case 'repo': return await this.repoChildren(node);
@@ -139,6 +141,12 @@ class GannetTree {
       }
     }
     return out.sort((a, b) => byName(a.owner, b.owner) || byName(a.account.login, b.account.login));
+  }
+
+  /** What Hide Owner and Hide Account left out, as set, so each can be shown again. */
+  hiddenList() {
+    return [...(this.hiddenOwners() || []).map((owner) => ({ kind: 'hiddenOwner', owner: String(owner) })),
+      ...(this.hiddenAccounts() || []).map((login) => ({ kind: 'hiddenAccount', login: String(login) }))];
   }
 
   /** Whether GitHub lists this repo for any account, as far as read: recently pushed, or a kept All repos list. */
@@ -248,6 +256,23 @@ class GannetTree {
         it.tooltip = !own ? `${owner}, reached through ${account.login}`
           : gh ? `${account.login}, logged in with the gh CLI` : `${account.login}, signed in to VS Code. To sign out, use VS Code's Accounts menu; Hide only removes it from Gannet.`;
         it.iconPath = new vs.ThemeIcon(node.org ? 'organization' : 'account');
+        return it;
+      }
+      case 'hidden': {
+        const it = new vs.TreeItem('Hidden', S.Collapsed);
+        it.description = String(this.hiddenList().length);
+        it.tooltip = 'Owners and accounts you hid; the eye on one shows it again';
+        it.contextValue = 'group-hidden';
+        it.iconPath = new vs.ThemeIcon('eye-closed');
+        return it;
+      }
+      case 'hiddenOwner': case 'hiddenAccount': {
+        const owner = node.kind === 'hiddenOwner';
+        const it = new vs.TreeItem(owner ? node.owner : node.login, S.None);
+        it.description = owner ? 'owner' : 'account';
+        it.tooltip = `Hidden; the eye shows ${owner ? 'this owner' : 'this account'} again`;
+        it.contextValue = owner ? 'hidden-owner' : 'hidden-account';
+        it.iconPath = new vs.ThemeIcon(owner ? 'organization' : 'account', new vs.ThemeColor('descriptionForeground'));
         return it;
       }
       case 'group': {

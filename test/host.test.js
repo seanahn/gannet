@@ -99,6 +99,22 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
     await vscode.commands.executeCommand('gannet.hideOwner', { kind: 'owner', account, owner: 'seanahn', own: true });
     await vscode.commands.executeCommand('gannet.hideOwner', { kind: 'owner', account, owner: 'BPMN2', own: false });
     assert.strictEqual(rec.configWrites.length, writes, 'own login and an owner already hidden: no write');
+    // Show Owner / Show Account take a hidden one back out of its setting (any case); the rest stay
+    vscode._config['gannet.hiddenOwners'] = ['bpmn2', 'tmio'];
+    await vscode.commands.executeCommand('gannet.showOwner', { kind: 'hiddenOwner', owner: 'BPMN2' });
+    assert.deepStrictEqual(rec.configWrites.at(-1), { key: 'gannet.hiddenOwners', v: ['tmio'], target: vscode.ConfigurationTarget.Global });
+    vscode._config['gannet.hiddenAccounts'] = ['old', 'other'];
+    await vscode.commands.executeCommand('gannet.showAccount', { kind: 'hiddenAccount', login: 'old' });
+    assert.deepStrictEqual(rec.configWrites.at(-1), { key: 'gannet.hiddenAccounts', v: ['other'], target: vscode.ConfigurationTarget.Global });
+    const nW = rec.configWrites.length;
+    await vscode.commands.executeCommand('gannet.showOwner', { kind: 'owner', owner: 'tmio' });
+    await vscode.commands.executeCommand('gannet.showOwner', { kind: 'hiddenOwner', owner: 'nothidden' });
+    assert.strictEqual(rec.configWrites.length, nW, 'only a hidden one, and only when it is hidden');
+    vscode._config['gannet.hiddenOwners'] = []; vscode._config['gannet.hiddenAccounts'] = [];
+    for (const [id, item] of [['gannet.showOwner', 'hidden-owner'], ['gannet.showAccount', 'hidden-account']]) {
+      assert.strictEqual(manifest.contributes.menus.commandPalette.find((m) => m.command === id).when, 'false', id);
+      assert.ok(manifest.contributes.menus['webview/context'].some((m) => m.command === id && m.when.includes(`viewItem == ${item}`)), id);
+    }
     const hideMenu = manifest.contributes.menus['webview/context'].find((m) => m.command === 'gannet.hideOwner');
     assert.ok(/viewItem == owner\b/.test(hideMenu.when), hideMenu.when);
 

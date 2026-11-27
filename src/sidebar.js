@@ -71,6 +71,8 @@ class GannetSidebar {
         const node = this.store.node(m.id);
         if (node && m.act === 'checkout') await cmd('gannet.checkout', node);
         else if (node && m.act === 'hideOwner' && node.kind === 'owner') await cmd('gannet.hideOwner', node);
+        else if (node && m.act === 'show' && node.kind === 'hiddenOwner') await cmd('gannet.showOwner', node);
+        else if (node && m.act === 'show' && node.kind === 'hiddenAccount') await cmd('gannet.showAccount', node);
         return;
       }
       case 'ws':

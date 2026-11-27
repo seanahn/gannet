@@ -71,7 +71,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   const checkout = createCheckout({ run, local, accounts, helperCommand, home });
 
   const newFolders = createNewFolders({ memento: machine });
-  const tree = new GannetTree({ vscode, accounts, clientFor, recent, local, cache: createRepoCache(store), workspaces, home, newFolders, hiddenOwners: () => settings().get('hiddenOwners', []) });
+  const tree = new GannetTree({ vscode, accounts, clientFor, recent, local, cache: createRepoCache(store), workspaces, home, newFolders, hiddenOwners: () => settings().get('hiddenOwners', []), hiddenAccounts: () => settings().get('hiddenAccounts', []) });
   const gfs = new GannetFs({ vscode, clientFor, accounts });
   const sidebar = new GannetSidebar({ vscode, tree, workspaces, home, extensionUri: context.extensionUri || vscode.Uri.file(context.extensionPath), canReveal: (p) => canReveal(p), checkName: (dir, name) => nameCheck(dir, name) });
   const refreshAll = () => { tree.redraw(); sidebar.refreshWorkspaces(); };   // only ⟳ reads the repo lists again
@@ -261,6 +261,19 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
       if (hidden.some((o) => String(o).toLowerCase() === node.owner.toLowerCase())) return;
       await settings().update('hiddenOwners', [...hidden, node.owner], vscode.ConfigurationTarget.Global);
     },
+    // the Hidden row's eye: out of the setting again (any case); the config change redraws
+    'gannet.showOwner': async (node) => {
+      if (!node || node.kind !== 'hiddenOwner') return;
+      const hidden = settings().get('hiddenOwners', []) || [];
+      const left = hidden.filter((o) => String(o).toLowerCase() !== node.owner.toLowerCase());
+      if (left.length !== hidden.length) await settings().update('hiddenOwners', left, vscode.ConfigurationTarget.Global);
+    },
+    'gannet.showAccount': async (node) => {
+      if (!node || node.kind !== 'hiddenAccount') return;
+      const hidden = settings().get('hiddenAccounts', []) || [];
+      const left = hidden.filter((l) => l !== node.login);
+      if (left.length !== hidden.length) await settings().update('hiddenAccounts', left, vscode.ConfigurationTarget.Global);
+    },
     'gannet.checkout': async (node) => {
       if (!node || !node.repo) return;
       const dir = await whereTo(node.repo);
@@ -330,7 +343,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   })();
 }
 
-const NODE_COMMANDS = new Set(['gannet.checkout', 'gannet.checkoutTo', 'gannet.openOnGitHub', 'gannet.revealLocal', 'gannet.addToWorkspace', 'gannet.pushAs', 'gannet.hideAccount', 'gannet.hideOwner', 'gannet.signIn', 'gannet.moveNewFolder', 'gannet.forgetNewFolder']);
+const NODE_COMMANDS = new Set(['gannet.checkout', 'gannet.checkoutTo', 'gannet.openOnGitHub', 'gannet.revealLocal', 'gannet.addToWorkspace', 'gannet.pushAs', 'gannet.hideAccount', 'gannet.hideOwner', 'gannet.signIn', 'gannet.moveNewFolder', 'gannet.forgetNewFolder', 'gannet.showOwner', 'gannet.showAccount']);
 
 function activate(context) { return activateWith(context); }
 

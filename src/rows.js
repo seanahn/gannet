@@ -11,6 +11,8 @@ function nodeKey(node) {
     case 'newFolder': return `n:${node.rec.path}`;
     case 'entry': return `e:${node.entry.path}`;
     case 'disk': return `d:${require('path').basename(node.path)}`;
+    case 'hiddenOwner': return `h:${node.owner}`.toLowerCase();
+    case 'hiddenAccount': return `a:${node.login}`.toLowerCase();
     case 'info': return `i:${node.label}`;
     case 'error': return 'x';
     default: return node.kind || '?';

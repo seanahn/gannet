@@ -149,6 +149,16 @@
         "command": "gannet.forgetNewFolder",
         "title": "Forget",
         "category": "Gannet"
+      },
+      {
+        "command": "gannet.showOwner",
+        "title": "Show Owner",
+        "category": "Gannet"
+      },
+      {
+        "command": "gannet.showAccount",
+        "title": "Show Account",
+        "category": "Gannet"
       }
     ],
     "menus": {
@@ -216,6 +226,14 @@
         {
           "command": "gannet.forgetNewFolder",
           "when": "false"
+        },
+        {
+          "command": "gannet.showOwner",
+          "when": "false"
+        },
+        {
+          "command": "gannet.showAccount",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -280,6 +298,16 @@
           "command": "gannet.hideOwner",
           "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem == owner",
           "group": "1_account@2"
+        },
+        {
+          "command": "gannet.showOwner",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem == hidden-owner",
+          "group": "1_account@1"
+        },
+        {
+          "command": "gannet.showAccount",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem == hidden-account",
+          "group": "1_account@1"
         }
       ]
     },

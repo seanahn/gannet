@@ -88,7 +88,18 @@ const S = vscode.TreeItemCollapsibleState;
 
     // Hide owner: an organization or another owner is left out (any case); an account's own login is not
     const th = make({ hiddenOwners: () => ['C3-E', 'seanahn'] });
-    assert.deepStrictEqual(await labels(undefined, th), ['c3-sahn', 'c3-taehokgil', 'seanahn', 'zz']);
+    assert.deepStrictEqual(await labels(undefined, th), ['c3-sahn', 'c3-taehokgil', 'seanahn', 'zz', 'Hidden']);
+    // what is hidden stays reachable: a Hidden row last, listing hidden owners then hidden accounts, as set
+    const tv = make({ hiddenOwners: () => ['bpmn2', 'tmio'], hiddenAccounts: () => ['old-login'] });
+    const hiddenNode = (await tv.getChildren()).at(-1);
+    const hi = tv.getTreeItem(hiddenNode);
+    assert.deepStrictEqual([hiddenNode.kind, hi.label, hi.description, hi.contextValue, hi.collapsibleState, hi.iconPath.id], ['hidden', 'Hidden', '3', 'group-hidden', S.Collapsed, 'eye-closed']);
+    const hk = await tv.getChildren(hiddenNode);
+    assert.deepStrictEqual(hk.map((n) => [n.kind, tv.getTreeItem(n).label, tv.getTreeItem(n).description, tv.getTreeItem(n).contextValue]),
+      [['hiddenOwner', 'bpmn2', 'owner', 'hidden-owner'], ['hiddenOwner', 'tmio', 'owner', 'hidden-owner'], ['hiddenAccount', 'old-login', 'account', 'hidden-account']]);
+    assert.strictEqual(tv.getTreeItem(hk[0]).iconPath.color.id, 'descriptionForeground');
+    assert.deepStrictEqual(childIds('hidden', hk), ['hidden/h:bpmn2', 'hidden/h:tmio', 'hidden/a:old-login']);
+    assert.ok(!(await make().getChildren()).some((n) => n.kind === 'hidden'), 'nothing hidden: no row');
 
     // a new window (another tree on the same folder): owners found only in the kept list show, with no fetch
     const t2 = make();
