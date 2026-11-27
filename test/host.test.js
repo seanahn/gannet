@@ -329,6 +329,109 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
       await ext.deactivate();
     }
 
+    // 0.5.0: New Folder…, Move to Owner…, Forget; ⟳ rescans the workspace directories
+    {
+      const hN = path.join(t, 'hN');
+      const wsN = path.join(hN, 'github');
+      fs.mkdirSync(wsN, { recursive: true });
+      const c = seed(ctx('storeN'), 'gannet.workspaces', [wsN]);
+      opts.folders = [path.join(tmp, 'ws')];
+      const ghRepos = [
+        { full_name: 'seanahn/perch', owner: { login: 'seanahn' }, name: 'perch', clone_url: bare, html_url: 'https://github.com/seanahn/perch', default_branch: 'main' },
+        { full_name: 'c3-e/hub', owner: { login: 'c3-e' }, name: 'hub', clone_url: bare, html_url: 'https://github.com/c3-e/hub', default_branch: 'main' },
+      ];
+      const fetchN = async (url) => ({ status: 200, ok: true, headers: { get: () => null }, json: async () => (/\/user\/repos/.test(String(url)) ? ghRepos : []) });
+      await ext.activateWith(c, { run, fetch: fetchN, home: hN });
+      const st = ext._state();
+      const nf = () => machine(c)['gannet.newFolders'] || [];
+      const pickOwner = (name) => (items) => items.find((i) => i.label === name);
+
+      // name checks in the input box (Review Focus 3); Escape at the name: nothing
+      opts.inputBox = undefined;
+      await vscode.commands.executeCommand('gannet.newFolder', { path: wsN });
+      const box = rec.inputBoxes.at(-1);
+      assert.ok(box.validateInput('..') && box.validateInput('a/b'), 'refused with a message');
+      assert.ok(!box.validateInput('my thing'));
+      fs.mkdirSync(path.join(wsN, 'old'));
+      assert.strictEqual(box.validateInput('old'), 'old exists: it will be put under an owner');
+      assert.deepStrictEqual(fs.readdirSync(wsN).sort(), ['old']);
+      assert.deepStrictEqual(nf(), []);
+
+      // Escape at the owner: nothing
+      opts.inputBox = 'newthing';
+      opts.quickPick = () => undefined;
+      await vscode.commands.executeCommand('gannet.newFolder', { path: wsN });
+      assert.ok(!fs.existsSync(path.join(wsN, 'newthing')));
+      assert.deepStrictEqual(nf(), []);
+      assert.deepStrictEqual(rec.quickPicks.at(-1).items.map((i) => [i.label, i.description]), [['c3-e', 'via seanahn'], ['c3-e', 'via vsuser'], ['seanahn', undefined], ['seanahn', 'via vsuser'], ['vsuser', undefined]], 'the owner rows the sidebar shows');
+
+      // created, recorded before the window changes, added to the window
+      opts.quickPick = pickOwner('c3-e');
+      const update = vscode.workspace.updateWorkspaceFolders;
+      let recordedFirst = null;
+      vscode.workspace.updateWorkspaceFolders = (...a) => { recordedFirst = nf().some((r) => r.path === path.join(wsN, 'newthing')); return update(...a); };
+      await vscode.commands.executeCommand('gannet.newFolder', { path: wsN });
+      vscode.workspace.updateWorkspaceFolders = update;
+      assert.ok(fs.statSync(path.join(wsN, 'newthing')).isDirectory());
+      assert.deepStrictEqual(nf(), [{ path: path.join(wsN, 'newthing'), owner: 'c3-e', account: 'seanahn' }]);
+      assert.strictEqual(recordedFirst, true, 'the record is written before the folder is added to the window');
+      assert.ok(opts.folders.includes(path.join(wsN, 'newthing')), 'added to the window');
+
+      // adopted: no mkdir; inside a window folder: not added again
+      opts.folders = [hN];
+      const ups = rec.folderUpdates.length;
+      opts.inputBox = 'old';
+      opts.quickPick = pickOwner('seanahn');
+      await vscode.commands.executeCommand('gannet.newFolder', { path: wsN });
+      assert.deepStrictEqual(nf().map((r) => [path.basename(r.path), r.owner]), [['newthing', 'c3-e'], ['old', 'seanahn']]);
+      assert.strictEqual(rec.folderUpdates.length, ups);
+
+      // already recorded, or already a GitHub clone: refused, nothing recorded
+      const errs = () => rec.messages.filter((m) => m.level === 'error').length;
+      let e0 = errs();
+      await vscode.commands.executeCommand('gannet.newFolder', { path: wsN });
+      assert.strictEqual(errs(), e0 + 1, 'already recorded');
+      sh(`git clone -q "${bare}" cloned && git -C cloned remote set-url origin https://github.com/seanahn/perch.git`, wsN);
+      opts.inputBox = 'cloned';
+      e0 = errs();
+      await vscode.commands.executeCommand('gannet.newFolder', { path: wsN });
+      assert.strictEqual(errs(), e0 + 1, 'a GitHub clone');
+      assert.strictEqual(nf().length, 2);
+
+      // mkdir failing (the name taken by a file after the check): an error, nothing recorded
+      opts.inputBox = (o) => { fs.writeFileSync(path.join(wsN, 'race'), 'x'); return 'race'; };
+      opts.quickPick = pickOwner('c3-e');
+      e0 = errs();
+      await vscode.commands.executeCommand('gannet.newFolder', { path: wsN });
+      assert.strictEqual(errs(), e0 + 1);
+      assert.strictEqual(nf().length, 2);
+
+      // Move to Owner… (picked, or dropped on a row) and Forget
+      const node = { kind: 'newFolder', owner: 'c3-e', account: { login: 'seanahn' }, rec: nf()[0], pending: null };
+      opts.quickPick = pickOwner('seanahn');
+      await vscode.commands.executeCommand('gannet.moveNewFolder', node);
+      assert.deepStrictEqual(nf()[0], { path: path.join(wsN, 'newthing'), owner: 'seanahn', account: 'seanahn' });
+      const before = rec.quickPicks.length;
+      await vscode.commands.executeCommand('gannet.moveNewFolder', node, { kind: 'owner', owner: 'c3-e', account: { login: 'seanahn' } });
+      assert.strictEqual(rec.quickPicks.length, before, 'a drop asks nothing');
+      assert.deepStrictEqual(nf()[0].owner, 'c3-e');
+      await vscode.commands.executeCommand('gannet.forgetNewFolder', node);
+      assert.deepStrictEqual(nf().map((r) => path.basename(r.path)), ['old']);
+      assert.ok(fs.existsSync(path.join(wsN, 'newthing')), 'the folder stays');
+
+      // Reveal and Add to Window work on its row
+      await vscode.commands.executeCommand('gannet.revealLocal', { kind: 'newFolder', owner: 'seanahn', account: { login: 'seanahn' }, rec: nf()[0] });
+      assert.strictEqual(rec.executed.at(-1).args[0].fsPath, path.join(wsN, 'old'));
+
+      // ⟳ rescans: a clone made by hand after start is found
+      sh(`git clone -q "${bare}" later && git -C later remote set-url origin https://github.com/seanahn/later.git`, wsN);
+      assert.strictEqual(st.local.checkoutsOf('seanahn/later').length, 0);
+      await vscode.commands.executeCommand('gannet.refresh');
+      assert.strictEqual(st.local.checkoutsOf('seanahn/later').length, 1);
+      opts.inputBox = undefined; opts.quickPick = undefined; opts.folders = [path.join(tmp, 'ws')];
+      await ext.deactivate();
+    }
+
     // the commands the manifest lists are the ones registered; 0.2.0's workspace-file commands are gone
     for (const id of ['gannet.openWorkspace', 'gannet.openWorkspaceHere', 'gannet.setRepoFolder']) {
       assert.ok(!manifest.contributes.commands.some((c) => c.command === id), id);
@@ -342,6 +445,15 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
     assert.ok(manifest.contributes.menus['webview/context'].length > 0);
     for (const m of manifest.contributes.menus['webview/context']) assert.ok(m.when.startsWith("webviewId == 'gannet.main' && webviewSection == 'row'"), m.when);
     for (const m of manifest.contributes.menus['view/title']) assert.strictEqual(m.when, 'view == gannet.main');
+    // 0.5.0: the new-folder commands, hidden from the palette, on the newfolder row
+    for (const id of ['gannet.newFolder', 'gannet.moveNewFolder', 'gannet.forgetNewFolder']) {
+      assert.ok(manifest.contributes.commands.some((cm) => cm.command === id), id);
+      assert.strictEqual(manifest.contributes.menus.commandPalette.find((m) => m.command === id).when, 'false', id);
+    }
+    const wctx = manifest.contributes.menus['webview/context'];
+    for (const id of ['gannet.moveNewFolder', 'gannet.forgetNewFolder', 'gannet.revealLocal', 'gannet.addToWorkspace']) {
+      assert.ok(wctx.some((m) => m.command === id && /newfolder/.test(m.when)), id + ' on a new folder');
+    }
     for (const id of ['gannet.revealWorkspace', 'gannet.removeWorkspace']) {
       assert.ok(manifest.contributes.menus.commandPalette.some((c) => c.command === id && c.when === 'false'), id);
     }

@@ -2,7 +2,7 @@
   "name": "gannet",
   "displayName": "Gannet",
   "description": "Your GitHub repos as a tree: browse files without cloning, check out into your workspace, push as the right account.",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "publisher": "seanahn",
   "license": "MIT",
   "repository": {
@@ -134,6 +134,21 @@
         "command": "gannet.removeWorkspace",
         "title": "Remove from List",
         "category": "Gannet"
+      },
+      {
+        "command": "gannet.newFolder",
+        "title": "New Folder…",
+        "category": "Gannet"
+      },
+      {
+        "command": "gannet.moveNewFolder",
+        "title": "Move to Owner…",
+        "category": "Gannet"
+      },
+      {
+        "command": "gannet.forgetNewFolder",
+        "title": "Forget",
+        "category": "Gannet"
       }
     ],
     "menus": {
@@ -189,6 +204,18 @@
         {
           "command": "gannet.revealWorkspace",
           "when": "false"
+        },
+        {
+          "command": "gannet.newFolder",
+          "when": "false"
+        },
+        {
+          "command": "gannet.moveNewFolder",
+          "when": "false"
+        },
+        {
+          "command": "gannet.forgetNewFolder",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -216,13 +243,23 @@
         },
         {
           "command": "gannet.revealLocal",
-          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem =~ /^(repo|checkout)-local/",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem =~ /^((repo|checkout)-local|newfolder$)/",
           "group": "1_checkout@3"
         },
         {
           "command": "gannet.addToWorkspace",
-          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem =~ /^(repo|checkout)-local/",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem =~ /^((repo|checkout)-local|newfolder$)/",
           "group": "1_checkout@4"
+        },
+        {
+          "command": "gannet.moveNewFolder",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem == newfolder",
+          "group": "3_newfolder@1"
+        },
+        {
+          "command": "gannet.forgetNewFolder",
+          "when": "webviewId == 'gannet.main' && webviewSection == 'row' && viewItem == newfolder",
+          "group": "3_newfolder@2"
         },
         {
           "command": "gannet.pushAs",

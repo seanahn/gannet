@@ -17,6 +17,7 @@ const { createMachineState } = require('./machineState.js');
 const { alive, expandHome } = require('./localRepos.js');
 const { GannetSidebar } = require('./sidebar.js');
 const { createRepoCache } = require('./repoCache.js');
+const { createNewFolders, checkName } = require('./newFolders.js');
 
 let state = null;
 
@@ -69,7 +70,8 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   };
   const checkout = createCheckout({ run, local, accounts, helperCommand, home });
 
-  const tree = new GannetTree({ vscode, accounts, clientFor, recent, local, cache: createRepoCache(store), workspaces, home, hiddenOwners: () => settings().get('hiddenOwners', []) });
+  const newFolders = createNewFolders({ memento: machine });
+  const tree = new GannetTree({ vscode, accounts, clientFor, recent, local, cache: createRepoCache(store), workspaces, home, newFolders, hiddenOwners: () => settings().get('hiddenOwners', []) });
   const gfs = new GannetFs({ vscode, clientFor, accounts });
   const sidebar = new GannetSidebar({ vscode, tree, workspaces, home, extensionUri: context.extensionUri || vscode.Uri.file(context.extensionPath), canReveal: (p) => canReveal(p) });
   const refreshAll = () => { tree.redraw(); sidebar.refreshWorkspaces(); };   // only ⟳ reads the repo lists again
@@ -171,6 +173,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   const oneCheckout = (node) => {
     if (!node) return null;
     if (node.kind === 'checkout') return node.checkout;
+    if (node.kind === 'newFolder') return { path: node.rec.path };
     const copies = node.repo ? local.checkoutsOf(node.repo.fullName) : [];
     return copies.length === 1 ? copies[0] : null;
   };
@@ -184,8 +187,62 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     refreshAll();
   }
 
+  // a folder not on GitHub yet: Gannet records which owner row it sits under; it never runs git in it
+  const recorded = (p) => newFolders.list().some((r) => r.path === p);
+  const nameCheck = (dir, name) => {
+    const c = checkName(dir, name);
+    if (c.ok && c.adopt && recorded(path.join(dir, name))) return { ok: false, message: `${name} is already under an owner.` };
+    return c;
+  };
+  async function pickOwner(title, except = null) {
+    const items = (await tree.owners())
+      .filter((o) => !(except && o.owner.toLowerCase() === except.owner.toLowerCase() && o.account.login === except.account))
+      .map((o) => ({ label: o.owner, description: o.own ? undefined : `via ${o.account.login}`, o }));
+    const pick = await vscode.window.showQuickPick(items, { title });
+    return pick ? { owner: pick.o.owner, account: pick.o.account.login } : null;
+  }
+  async function newFolder(node) {
+    const dir = node && node.path;
+    if (!dir) return;
+    const name = await vscode.window.showInputBox({
+      title: `New folder in ${W.tilde(dir, home)}`, prompt: 'A folder for a repo not on GitHub yet',
+      validateInput: (v) => { const c = nameCheck(dir, v); return !c.ok ? c.message : c.adopt ? `${v} exists: it will be put under an owner` : null; },
+    });
+    if (name === undefined) return;
+    const c = nameCheck(dir, name);
+    if (!c.ok) { vscode.window.showErrorMessage(`Gannet: ${c.message}`); return; }
+    const p = path.join(dir, name);
+    const to = await pickOwner(`Put ${name} under…`);
+    if (!to) return;
+    if (!c.adopt) {
+      try { fs.mkdirSync(p); } catch (e) { vscode.window.showErrorMessage(`Gannet: could not create ${p}: ${e.message}`); return; }
+    }
+    await newFolders.add({ path: p, ...to });   // recorded first: adding a folder to the window can restart the extension
+    tree.redraw();
+    await place(p);
+  }
+
   const commands = {
-    'gannet.refresh': () => { accounts.forgetAll(); tree.refresh(); },
+    'gannet.refresh': async () => {
+      accounts.forgetAll();
+      for (const f of listed()) { local.cleanPartials(f); await local.scan(f); }   // clones made by hand since start
+      tree.refresh();
+    },
+    'gannet.newFolder': newFolder,
+    'gannet.moveNewFolder': async (node, target) => {
+      if (!node || node.kind !== 'newFolder') return;
+      const to = target && target.kind === 'owner' && target.owner && target.account
+        ? { owner: target.owner, account: target.account.login }
+        : await pickOwner(`Move ${path.basename(node.rec.path)} to…`, { owner: node.owner, account: node.account.login });
+      if (!to) return;
+      await newFolders.move(node.rec.path, to);
+      tree.redraw();
+    },
+    'gannet.forgetNewFolder': async (node) => {
+      if (!node || node.kind !== 'newFolder') return;
+      await newFolders.forget(node.rec.path);   // the folder stays on disk
+      tree.redraw();
+    },
     'gannet.addAccount': async () => { const a = await accounts.addVsCodeAccount(); if (a) tree.redraw(); },
     'gannet.signIn': async () => { await accounts.addVsCodeAccount(); tree.redraw(); },
     'gannet.hideAccount': async (node) => {
@@ -268,7 +325,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   })();
 }
 
-const NODE_COMMANDS = new Set(['gannet.checkout', 'gannet.checkoutTo', 'gannet.openOnGitHub', 'gannet.revealLocal', 'gannet.addToWorkspace', 'gannet.pushAs', 'gannet.hideAccount', 'gannet.hideOwner', 'gannet.signIn']);
+const NODE_COMMANDS = new Set(['gannet.checkout', 'gannet.checkoutTo', 'gannet.openOnGitHub', 'gannet.revealLocal', 'gannet.addToWorkspace', 'gannet.pushAs', 'gannet.hideAccount', 'gannet.hideOwner', 'gannet.signIn', 'gannet.moveNewFolder', 'gannet.forgetNewFolder']);
 
 function activate(context) { return activateWith(context); }
 
