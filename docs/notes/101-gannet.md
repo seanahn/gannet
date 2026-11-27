@@ -433,13 +433,15 @@ GANNET                               [+ account] [⟳]
 
 ### What it is
 
-- **New Folder…** is a new hover button on each workspace directory in the panel (not on a Missing one). It asks
-  for a name, then which owner the folder is for, creates `<workspace>/<name>`, and shows it under that owner.
+- **New Folder…** is a new hover button on each workspace directory in the panel (not on a Missing one). It opens a
+  name box in place, just under that directory's row, as Explorer's New File does (*Sean: "can you do that in
+  place without using vscode's text box on top?"*); Enter takes the name, Escape or clicking away cancels. Then it
+  asks which owner the folder is for (VS Code's quick pick), and creates `<workspace>/<name>`, and shows it under that owner.
   *(Sean)*
-  - The name is one folder name: not empty, no `/` or `\`, not `.` or `..`. The input box says what is wrong and
-    lets you fix it. *(builder's call)*
-  - **A folder of that name already there** (one Claude made, say) is adopted instead of created: the input box
-    says `<name> exists: it will be put under an owner`, and the rest is the same, with no mkdir. A file of that
+  - The name is one folder name: not empty, no `/` or `\`, not `.` or `..`. The message under the name box says what
+    is wrong as you type, and Enter does nothing until it is fixed. *(builder's call)*
+  - **A folder of that name already there** (one Claude made, say) is adopted instead of created: the message under
+    the box says `<name> exists: it will be put under an owner`, and the rest is the same, with no mkdir. A file of that
     name, a folder whose `origin` is already a GitHub repo, or one already recorded is refused with a message
     saying so. *(Sean chose adoption over listing unplaced folders: most new folders are made by asking Claude)*
   - The owner is picked from the owner rows the sidebar shows now, labelled as they are (`c3-e  via c3-sahn`);
@@ -505,7 +507,7 @@ GANNET                               [+ account] [⟳]
 ```
  Page (webview)            Extension                         Disk / settings
    |-- ws newFolder(path) ->|                                   |
-   |                        |-- input: name (validated) ------->|  Escape: nothing
+   |                        |-- name box in place (checked as typed) |  Escape: nothing
    |                        |   exists? adopt; file/GitHub clone/recorded: refused
    |                        |-- quick pick: owner row           |  Escape: nothing
    |                        |-- mkdir <ws>/<name> (unless adopted) ->|
@@ -534,6 +536,8 @@ Calls made while building it *(builder's calls)*:
 - Reveal on a row (a new folder or a checkout) shows it in the Explorer when it is inside the window's folders, else
   in the file manager; in a remote window, which has none, it says to Add to Window instead.
 - The name box already says no to a folder that is recorded under an owner, as well as after Enter.
+- The extension checks the typed name each time it changes (the page asks, the extension answers); an answer for a
+  name no longer in the box is dropped. A command call without a name still asks in VS Code's input box.
 - ⟳ rescans every listed workspace for clones, so one made by hand since VS Code started shows without a reload.
 
 ## Checkout

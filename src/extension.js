@@ -73,7 +73,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   const newFolders = createNewFolders({ memento: machine });
   const tree = new GannetTree({ vscode, accounts, clientFor, recent, local, cache: createRepoCache(store), workspaces, home, newFolders, hiddenOwners: () => settings().get('hiddenOwners', []) });
   const gfs = new GannetFs({ vscode, clientFor, accounts });
-  const sidebar = new GannetSidebar({ vscode, tree, workspaces, home, extensionUri: context.extensionUri || vscode.Uri.file(context.extensionPath), canReveal: (p) => canReveal(p) });
+  const sidebar = new GannetSidebar({ vscode, tree, workspaces, home, extensionUri: context.extensionUri || vscode.Uri.file(context.extensionPath), canReveal: (p) => canReveal(p), checkName: (dir, name) => nameCheck(dir, name) });
   const refreshAll = () => { tree.redraw(); sidebar.refreshWorkspaces(); };   // only ⟳ reads the repo lists again
   state = { accounts, recent, local, tree, server, checkout, workspaces, sidebar };
 
@@ -208,13 +208,14 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   async function newFolder(node) {
     const dir = node && node.path;
     if (!dir) return;
-    const name = await vscode.window.showInputBox({
+    // the sidebar names it in place; with no name (a caller other than the page) it asks in an input box
+    const name = typeof node.name === 'string' ? node.name : await vscode.window.showInputBox({
       title: `New folder in ${W.tilde(dir, home)}`, prompt: 'A folder for a repo not on GitHub yet',
       validateInput: (v) => { const c = nameCheck(dir, v); return !c.ok ? c.message : c.adopt ? `${v} exists: it will be put under an owner` : null; },
     });
     if (name === undefined) return;
     const c = nameCheck(dir, name);
-    if (!c.ok) { vscode.window.showErrorMessage(`Gannet: ${c.message}`); return; }
+    if (!c.ok) { vscode.window.showErrorMessage(`Gannet: ${c.message}`); return; }   // e.g. taken since it was checked
     const p = path.join(dir, name);
     const to = await pickOwner(`Put ${name} under…`);
     if (!to) return;

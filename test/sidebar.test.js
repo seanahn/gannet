@@ -96,8 +96,11 @@ const { GannetSidebar } = require('../src/sidebar.js');
       assert.strictEqual(sb.resolve({ nodeId: aId + '/i:old' }), undefined, 'nor remembered');
     }
     // 0.5.0: New Folder from the panel; a drop moves a new folder onto an owner, and nothing else moves
-    await view._send({ type: 'ws', act: 'newFolder', path: gh });
-    assert.deepStrictEqual(rec.executed.at(-1), { id: 'gannet.newFolder', args: [{ path: gh }] });
+    await view._send({ type: 'ws', act: 'create', path: gh, name: 'newthing' });
+    assert.deepStrictEqual(rec.executed.at(-1), { id: 'gannet.newFolder', args: [{ path: gh, name: 'newthing' }] });
+    const nCheck = view._posted.length;
+    await view._send({ type: 'checkName', path: gh, name: 'x' });
+    assert.strictEqual(view._posted.length, nCheck, 'no checker: no answer');
     {
       const ownerA = { kind: 'owner', owner: 'c3-e', account: { login: 'c3-sahn' }, own: false };
       const ownerB = { kind: 'owner', owner: 'seanahn', account: { login: 'seanahn' }, own: true };
@@ -108,13 +111,17 @@ const { GannetSidebar } = require('../src/sidebar.js');
         getTreeItem: (n) => ({ label: n.owner || (n.rec && 'x') || n.repo.name, collapsibleState: n.kind === 'owner' ? 1 : 0, contextValue: n.kind === 'owner' ? 'owner' : n.kind === 'newFolder' ? 'newfolder' : 'repo-remote' }),
         getChildren: async (n) => (!n ? [ownerA, ownerB] : n === ownerA ? [nfNode, repoNode] : []),
       };
-      const sb = new GannetSidebar({ vscode, tree: small, workspaces: fx.workspaces, home: fx.home, extensionUri: vscode.Uri.file('/ext') });
+      const sb = new GannetSidebar({ vscode, tree: small, workspaces: fx.workspaces, home: fx.home, extensionUri: vscode.Uri.file('/ext'), checkName: (dir, name) => (name === '..' ? { ok: false, message: 'no' } : name === 'old' ? { ok: true, adopt: true } : { ok: true, adopt: false }) });
       vscode.window.registerWebviewViewProvider('gannet.dnd', sb);
       const v = vscode._resolveView('gannet.dnd');
       await v._send({ type: 'ready' });
       const [rA, rB] = v._posted.at(-1).rows;
       await v._send({ type: 'expand', id: rA.id });
       const [rNf, rRepo] = v._posted.at(-1).rows;
+      for (const [name, message, error] of [['..', 'no', true], ['old', 'old exists: it will be put under an owner', false], ['fresh', null, false]]) {
+        await v._send({ type: 'checkName', path: '/w', name });
+        assert.deepStrictEqual(v._posted.at(-1), { type: 'nameCheck', path: '/w', name, message, error });
+      }
       await v._send({ type: 'move', id: rNf.id, to: rB.id });
       assert.strictEqual(rec.executed.at(-1).id, 'gannet.moveNewFolder');
       assert.strictEqual(rec.executed.at(-1).args[0], nfNode);

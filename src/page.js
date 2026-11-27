@@ -26,6 +26,13 @@ const CSS = `
   .ws:hover .acts, .row:hover .acts { display: inline-flex; }
   .act { background: none; border: 0; color: inherit; padding: 2px; margin: 0; cursor: pointer; display: inline-flex; border-radius: 3px; }
   .act:hover { background: var(--vscode-list-hoverBackground); }
+  .ws.naming { cursor: default; }
+  .ws.naming:hover { background: none; }
+  input.name { flex: 1; min-width: 0; height: 18px; box-sizing: border-box; font: inherit; color: var(--vscode-input-foreground);
+    background: var(--vscode-input-background); border: 1px solid var(--vscode-focusBorder); outline: none; padding: 0 3px; user-select: text; }
+  .hint { margin: 0 4px 2px 30px; padding: 2px 6px; font-size: 0.92em; line-height: 1.4; white-space: normal; border: 1px solid; }
+  .hint.error { background: var(--vscode-inputValidation-errorBackground); border-color: var(--vscode-inputValidation-errorBorder); }
+  .hint.info { background: var(--vscode-inputValidation-infoBackground); border-color: var(--vscode-inputValidation-infoBorder); }
   #tree { outline: none; }
   #tree:focus .row.focused { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px;
     background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }

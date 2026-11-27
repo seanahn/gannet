@@ -59,13 +59,17 @@
       + '</div>';
   }
 
-  /** The workspace panel: one row per directory with its hover buttons, then Add folder…. */
-  function workspacesHtml(items) {
+  /** The workspace panel: one row per directory with its hover buttons, then Add folder…. While a new folder is
+   *  being named, its name box (and the check's message) sits under that directory's row, as Explorer's does. */
+  function workspacesHtml(items, naming = null) {
+    const box = (w) => (!naming || naming.path !== w.path ? ''
+      : `<div class="ws naming"><span class="lic">${ICONS['new-folder']}</span><input class="name" type="text" spellcheck="false" value="${esc(naming.name)}" aria-label="New folder name"></div>`
+        + (naming.message ? `<div class="hint ${naming.error ? 'error' : 'info'}">${esc(naming.message)}</div>` : ''));
     return items.map((w) => `<div class="ws${w.missing ? ' missing' : ''}" data-path="${esc(w.path)}" title="${esc(w.path)}">`
       + `<span class="label">${esc(w.label)}</span>${w.missing ? '<span class="desc">Missing</span>' : ''}<span class="acts">`
       + (w.missing ? '' : `<button class="act" data-act="newFolder" title="New Folder…">${ICONS['new-folder']}</button>`)
       + (w.missing || !w.reveal ? '' : `<button class="act" data-act="reveal" title="Reveal">${ICONS['folder-opened']}</button>`)
-      + `<button class="act" data-act="remove" title="Remove from List">${ICONS.close}</button></span></div>`).join('')
+      + `<button class="act" data-act="remove" title="Remove from List">${ICONS.close}</button></span></div>` + box(w)).join('')
       + `<div class="ws add" data-act="add" title="Add a folder Gannet checks repos out into"><span class="lic">${ICONS.add}</span><span class="label">Add folder…</span></div>`;
   }
 
@@ -110,15 +114,26 @@
   const vscode = acquireVsCodeApi();
   const saved = vscode.getState() || {};
   const openState = saved.open || {};          // id -> true/false, set by the user; else the row's own default
-  let roots = [], kids = new Map(), byId = new Map(), asked = new Set(), loading = new Set(), wsItems = [], focus = saved.focus || null;
+  let roots = [], kids = new Map(), byId = new Map(), asked = new Set(), loading = new Set(), wsItems = [], naming = null, focus = saved.focus || null;
   const $ws = document.getElementById('ws'), $tree = document.getElementById('tree');
 
   const isOpen = (row) => (row.id in openState ? openState[row.id] : !!row.expanded);
   const openSet = () => { const s = new Set(); for (const r of byId.values()) if (r.hasChildren && isOpen(r)) s.add(r.id); return s; };
   const save = () => vscode.setState({ open: openState, focus });
 
+  // the name box survives redraws: the panel is redrawn whenever rows arrive, so the caret is put back
+  function drawWs() {
+    const input = $ws.querySelector('input.name');
+    const had = input && document.activeElement === input ? [input.selectionStart, input.selectionEnd] : null;
+    if (naming && !wsItems.some((w) => w.path === naming.path && !w.missing)) naming = null;   // its directory went
+    $ws.innerHTML = workspacesHtml(wsItems, naming);
+    const box = $ws.querySelector('input.name');
+    if (box && (had || naming.focus)) { box.focus(); if (had) box.setSelectionRange(had[0], had[1]); naming.focus = false; }
+  }
+  function endNaming() { if (naming) { naming = null; drawWs(); } }
+
   function render() {
-    $ws.innerHTML = workspacesHtml(wsItems);
+    drawWs();
     const open = openSet();
     const list = visible(roots, kids, open);
     $tree.innerHTML = list.map(({ row, depth }) => rowHtml(row, depth, { open: open.has(row.id), loading: loading.has(row.id), focused: row.id === focus })).join('');
@@ -144,6 +159,9 @@
   window.addEventListener('message', (e) => {
     const m = e.data || {};
     if (m.type === 'workspaces') { wsItems = m.items || []; render(); }
+    else if (m.type === 'nameCheck') {   // only the answer for what is in the box now
+      if (naming && naming.path === m.path && naming.name === m.name) { naming.message = m.name ? m.message : null; naming.error = !!m.error; drawWs(); }
+    }
     else if (m.type === 'rows') {
       for (const r of m.rows || []) byId.set(r.id, r);
       if (m.parent == null) roots = m.rows || []; else kids.set(m.parent, m.rows || []);
@@ -208,7 +226,30 @@
     if (!act) return;
     if (act.dataset.act === 'add') { vscode.postMessage({ type: 'ws', act: 'add' }); return; }
     const row = e.target.closest('.ws');
+    if (act.dataset.act === 'newFolder') { naming = { path: row.dataset.path, name: '', message: null, error: false, focus: true }; drawWs(); return; }
     vscode.postMessage({ type: 'ws', act: act.dataset.act, path: row.dataset.path });
+  });
+
+  $ws.addEventListener('input', (e) => {
+    if (!naming || !e.target.matches('input.name')) return;
+    naming.name = e.target.value;
+    if (!naming.name) { naming.message = null; naming.error = false; drawWs(); return; }
+    vscode.postMessage({ type: 'checkName', path: naming.path, name: naming.name });
+  });
+  $ws.addEventListener('keydown', (e) => {
+    if (!naming || !e.target.matches('input.name')) return;
+    if (e.key === 'Escape') { e.preventDefault(); endNaming(); return; }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (!naming.name.trim() || naming.error) return;   // the message says why
+    const { path, name } = naming;
+    naming = null; drawWs();
+    vscode.postMessage({ type: 'ws', act: 'create', path, name });
+  });
+  // clicking elsewhere cancels, as in Explorer's name box; a redraw replacing the box is not a click away
+  $ws.addEventListener('focusout', (e) => {
+    if (!e.target.matches || !e.target.matches('input.name')) return;
+    setTimeout(() => { if (naming && !$ws.contains(document.activeElement)) endNaming(); }, 0);
   });
 
   vscode.postMessage({ type: 'ready' });

@@ -7,8 +7,8 @@ const { createRowStore } = require('./rows.js');
 const { pageHtml } = require('./page.js');
 
 class GannetSidebar {
-  constructor({ vscode, tree, workspaces, home, extensionUri, canReveal = () => true }) {
-    Object.assign(this, { vscode, tree, workspaces, home, extensionUri, canReveal });
+  constructor({ vscode, tree, workspaces, home, extensionUri, canReveal = () => true, checkName = null }) {
+    Object.assign(this, { vscode, tree, workspaces, home, extensionUri, canReveal, checkName });
     this.store = createRowStore(tree);
     this.view = null;
     tree.onDidChangeTreeData(() => { this.store.clear(); this.post({ type: 'reset' }); });
@@ -76,8 +76,15 @@ class GannetSidebar {
         if (m.act === 'add') await cmd('gannet.addWorkspace');
         else if (m.act === 'remove' && m.path) await cmd('gannet.removeWorkspace', { path: m.path });
         else if (m.act === 'reveal' && m.path) await cmd('gannet.revealWorkspace', { path: m.path });
-        else if (m.act === 'newFolder' && m.path) await cmd('gannet.newFolder', { path: m.path });
+        else if (m.act === 'create' && m.path && typeof m.name === 'string') await cmd('gannet.newFolder', { path: m.path, name: m.name });
         return;
+      case 'checkName': {   // the name typed in place, checked as it is typed
+        if (!this.checkName || !m.path || typeof m.name !== 'string') return;
+        const c = this.checkName(m.path, m.name);
+        const message = !c.ok ? c.message : c.adopt ? `${m.name} exists: it will be put under an owner` : null;
+        this.post({ type: 'nameCheck', path: m.path, name: m.name, message, error: !c.ok });
+        return;
+      }
       case 'move': {   // a new folder dropped on an owner row; anything else is ignored
         const node = this.store.node(m.id), target = this.store.node(m.to);
         if (node && node.kind === 'newFolder' && target && target.kind === 'owner') await cmd('gannet.moveNewFolder', node, target);

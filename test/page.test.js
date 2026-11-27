@@ -59,6 +59,16 @@ const ws2 = P.workspacesHtml([{ path: '/git', label: '/git', missing: false, rev
 assert.strictEqual((ws2.match(/data-act="newFolder"/g) || []).length, 1);
 assert.ok(ws2.includes('title="New Folder…"'));
 assert.ok(ws2.indexOf('data-act="newFolder"') < ws2.indexOf('data-act="reveal"'), 'before Reveal');
+// the name is typed in place: an input under its workspace row, the check's message under it
+const two = [{ path: '/git', label: '/git', missing: false, reveal: true }, { path: '/w', label: '~/w', missing: false, reveal: true }];
+const nm = P.workspacesHtml(two, { path: '/git', name: 'a"b', message: null });
+assert.strictEqual((nm.match(/<input /g) || []).length, 1);
+assert.ok(nm.includes('class="name"') && nm.includes('value="a&quot;b"'), 'the typed name, escaped');
+assert.ok(nm.indexOf('data-path="/git"') < nm.indexOf('<input ') && nm.indexOf('<input ') < nm.indexOf('data-path="/w"'), 'under its own row');
+assert.ok(!nm.includes('class="hint'));
+assert.ok(P.workspacesHtml(two, { path: '/w', name: '..', message: '".." is not a folder name.', error: true }).includes('<div class="hint error">&quot;..&quot; is not a folder name.</div>'));
+assert.ok(P.workspacesHtml(two, { path: '/w', name: 'old', message: 'old exists', error: false }).includes('<div class="hint info">old exists</div>'));
+assert.ok(!P.workspacesHtml(two).includes('<input '), 'no input unless naming');
 const nfRow = { id: 'o:c3-sahn:c3-e/n:/w/x', label: 'x', hasChildren: true, contextValue: 'newfolder', icon: { id: 'github-alt', color: 'descriptionForeground' } };
 const ownerE = { id: 'o:c3-sahn:c3-e', label: 'c3-e', hasChildren: true, contextValue: 'owner' };
 const ownerS = { id: 'o:seanahn:seanahn', label: 'seanahn', hasChildren: true, contextValue: 'account-vscode' };

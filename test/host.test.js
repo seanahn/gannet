@@ -406,6 +406,19 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
       assert.strictEqual(errs(), e0 + 1);
       assert.strictEqual(nf().length, 2);
 
+      // typed in place in the sidebar: the name comes with the command, no input box; the page asks for the check
+      const nBoxes = rec.inputBoxes.length;
+      opts.quickPick = pickOwner('c3-e');
+      await vscode.commands.executeCommand('gannet.newFolder', { path: wsN, name: 'inplace' });
+      assert.strictEqual(rec.inputBoxes.length, nBoxes);
+      assert.ok(nf().some((r) => r.path === path.join(wsN, 'inplace')));
+      const view = vscode._resolveView('gannet.main');
+      await view._send({ type: 'checkName', path: wsN, name: 'inplace' });
+      assert.deepStrictEqual(view._posted.at(-1), { type: 'nameCheck', path: wsN, name: 'inplace', message: 'inplace is already under an owner.', error: true });
+      fs.mkdirSync(path.join(wsN, 'plain'));
+      await view._send({ type: 'checkName', path: wsN, name: 'plain' });
+      assert.deepStrictEqual(view._posted.at(-1), { type: 'nameCheck', path: wsN, name: 'plain', message: 'plain exists: it will be put under an owner', error: false });
+      await vscode.commands.executeCommand('gannet.forgetNewFolder', { kind: 'newFolder', owner: 'c3-e', account: { login: 'seanahn' }, rec: { path: path.join(wsN, 'inplace') } });
       // Move to Owner… (picked, or dropped on a row) and Forget
       const node = { kind: 'newFolder', owner: 'c3-e', account: { login: 'seanahn' }, rec: nf()[0], pending: null };
       opts.quickPick = pickOwner('seanahn');
