@@ -52,4 +52,6 @@ assert.ok(html.includes('id="ws"') && html.includes('id="tree"'));
 assert.ok(P.ICONS['github-alt'].includes('M21.035 5.257'), 'codicon github-alt');
 // the cat draws at about 13 px inside the 16 px icon box (Sean: "can you make the icon smaller")
 assert.ok(P.ICONS['github-alt'].includes('viewBox="-3 -3 30 30"'), 'padded viewBox');
+// All repos: two small codicon cats, one behind the other (Sean: "small 2 cats icon")
+assert.strictEqual((P.ICONS.repos.match(/M21\.035 5\.257/g) || []).length, 2, 'two cats');
 console.log('PAGE OK');

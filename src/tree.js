@@ -221,7 +221,7 @@ class GannetTree {
         const kept = this.cache && this.cache.get(login);
         it.tooltip = kept ? `Fetched ${new Date(kept.fetchedAt).toLocaleString()} — ⟳ fetches again` : 'Every repo of this owner the account can reach';
         it.contextValue = 'group-all';
-        it.iconPath = new vs.ThemeIcon('repo');
+        it.iconPath = new vs.ThemeIcon('repos');   // not a codicon: the sidebar page draws it, two cats
         return it;
       }
       case 'repo': {

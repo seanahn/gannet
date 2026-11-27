@@ -63,6 +63,7 @@ const S = vscode.TreeItemCollapsibleState;
     const sean = roots[2];
     await recent.touch('seanahn', 'seanahn/roost');
     assert.deepStrictEqual(await labels(sean), ['roost', 'perch', 'All repos']);
+    assert.strictEqual(item((await tree.getChildren(sean)).at(-1)).iconPath.id, 'repos', 'All repos: the two-cat icon the page draws');
     assert.deepStrictEqual(await labels(roots[0]), ['hub', 'All repos'], "c3-e's own, not c3-sahn's");
     const [roostNode, perchNode, allNode] = await tree.getChildren(sean);
     assert.strictEqual(item(perchNode).description, 'private');
