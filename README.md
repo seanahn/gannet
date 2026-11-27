@@ -50,7 +50,9 @@ GANNET                               [+ account] [⟳]
 
 The panel on top lists the directories you keep checkouts in on this machine, such as `/git` and `~/github`
 locally or `~/` on a remote machine. **Add folder…** adds a directory (not a repo itself); hovering a directory
-shows **Reveal in File Manager** and **Remove from List**, which forgets it and deletes nothing. A directory that
+shows **Reveal** and **Remove from List**, which forgets it and deletes nothing. Reveal shows the directory in the
+Explorer when it is in this window, else in your file manager; in a remote window, where there is no file manager,
+a directory outside the window has no Reveal. A directory that
 is gone shows **Missing**. Each machine has its own list, and every listed directory is scanned on start for
 clones. Upgrading from 0.2.0 carries its list over once, with each workspace file replaced by its repo folder,
 plus `~/github` if it exists. The design, with the reasons behind each rule:

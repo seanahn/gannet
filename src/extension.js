@@ -71,7 +71,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
 
   const tree = new GannetTree({ vscode, accounts, clientFor, recent, local, cache: createRepoCache(store), workspaces, home, hiddenOwners: () => settings().get('hiddenOwners', []) });
   const gfs = new GannetFs({ vscode, clientFor, accounts });
-  const sidebar = new GannetSidebar({ vscode, tree, workspaces, home, extensionUri: context.extensionUri || vscode.Uri.file(context.extensionPath) });
+  const sidebar = new GannetSidebar({ vscode, tree, workspaces, home, extensionUri: context.extensionUri || vscode.Uri.file(context.extensionPath), canReveal: (p) => canReveal(p) });
   const refreshAll = () => { tree.redraw(); sidebar.refreshWorkspaces(); };   // only ⟳ reads the repo lists again
   state = { accounts, recent, local, tree, server, checkout, workspaces, sidebar };
 
@@ -93,6 +93,10 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   const reveal = async (p) => vscode.commands.executeCommand(inWorkspace(p) ? 'revealInExplorer' : 'revealFileInOS', vscode.Uri.file(p));
   const within = (p, dir) => { const r = path.relative(dir, p); return !r.startsWith('..') && !path.isAbsolute(r); };   // or equal
   const windowFolders = () => (vscode.workspace.workspaceFolders || []).filter((f) => f.uri.scheme === 'file').map((f) => f.uri.fsPath);
+
+  // shown in VS Code's Explorer when inside the window's folders; else the OS file manager, which a remote window lacks
+  const inWindow = (p) => windowFolders().some((d) => within(p, d));
+  const canReveal = (p) => inWindow(p) || !vscode.env.remoteName;
 
   // a finished checkout goes into this window, unless it already shows inside one of its folders (seclab's ~/)
   const place = (p) => (windowFolders().some((d) => within(p, d)) ? true : addToWorkspace(p));
@@ -212,7 +216,11 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     'gannet.revealLocal': async (node) => { const c = oneCheckout(node); if (c) await reveal(c.path); },
     'gannet.addWorkspace': addWorkspace,
     'gannet.removeWorkspace': async (node) => { if (node && node.path) { await workspaces.remove(node.path); refreshAll(); } },
-    'gannet.revealWorkspace': (node) => node && node.path && vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(node.path)),
+    'gannet.revealWorkspace': async (node) => {
+      if (!node || !node.path) return;
+      if (inWindow(node.path)) await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(node.path));
+      else if (!vscode.env.remoteName) await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(node.path));
+    },
     'gannet.addToWorkspace': async (node) => { const c = oneCheckout(node); if (c) await addToWorkspace(c.path); },
     'gannet.pushAs': async (node) => {
       const c = oneCheckout(node);
@@ -244,6 +252,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     ...Object.entries(commands).map(([id, fn]) => vscode.commands.registerCommand(id, NODE_COMMANDS.has(id) ? (arg, ...rest) => fn(sidebar.resolve(arg) || arg, ...rest) : fn)),
     accounts.onDidChange(() => tree.redraw()),
     vscode.workspace.onDidChangeConfiguration((e) => { if (e.affectsConfiguration('gannet')) refreshAll(); }),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => sidebar.refreshWorkspaces()),
     { dispose: () => { if (server) server.close(); } },
   );
 

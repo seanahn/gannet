@@ -49,7 +49,7 @@
   function workspacesHtml(items) {
     return items.map((w) => `<div class="ws${w.missing ? ' missing' : ''}" data-path="${esc(w.path)}" title="${esc(w.path)}">`
       + `<span class="label">${esc(w.label)}</span>${w.missing ? '<span class="desc">Missing</span>' : ''}<span class="acts">`
-      + (w.missing ? '' : `<button class="act" data-act="reveal" title="Reveal in File Manager">${ICONS['folder-opened']}</button>`)
+      + (w.missing || !w.reveal ? '' : `<button class="act" data-act="reveal" title="Reveal">${ICONS['folder-opened']}</button>`)
       + `<button class="act" data-act="remove" title="Remove from List">${ICONS.close}</button></span></div>`).join('')
       + `<div class="ws add" data-act="add" title="Add a folder Gannet checks repos out into"><span class="lic">${ICONS.add}</span><span class="label">Add folder…</span></div>`;
   }

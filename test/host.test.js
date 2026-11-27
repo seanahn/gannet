@@ -261,9 +261,27 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
       await vscode.commands.executeCommand('gannet.addWorkspace');
       assert.ok(!st.workspaces.list().includes(path.join(ghB, 'perch')), 'a repo is not a workspace');
       assert.strictEqual(rec.messages.at(-1).level, 'error');
+      // Reveal: inside the window's folders, in VS Code's Explorer; outside, the OS file manager, except in a remote
+      // window, where there is none to open: no button, and the command does nothing
       await vscode.commands.executeCommand('gannet.revealWorkspace', { kind: 'workspace', path: extra });
-      assert.strictEqual(rec.executed.at(-1).id, 'revealFileInOS');
+      assert.strictEqual(rec.executed.at(-1).id, 'revealInExplorer');
       assert.strictEqual(rec.executed.at(-1).args[0].fsPath, extra);
+      const far = path.join(tmp, 'far');
+      fs.mkdirSync(far);
+      await st.workspaces.add(far);
+      await vscode.commands.executeCommand('gannet.revealWorkspace', { path: far });
+      assert.strictEqual(rec.executed.at(-1).id, 'revealFileInOS');
+      assert.strictEqual(rec.executed.at(-1).args[0].fsPath, far);
+      opts.remoteName = 'ssh-remote';
+      const ranR = rec.executed.length;
+      await vscode.commands.executeCommand('gannet.revealWorkspace', { path: far });
+      assert.strictEqual(rec.executed.length, ranR + 1, 'only the Gannet command itself ran');
+      vscode._foldersChanged.fire({ added: [], removed: [] });
+      const panel = sv._posted.filter((m) => m.type === 'workspaces').at(-1).items;
+      assert.deepStrictEqual(panel.filter((w) => w.path === far || w.path === extra).map((w) => [w.path, w.reveal]), [[extra, true], [far, false]],
+        'the panel follows the window: no Reveal on a remote directory outside it');
+      opts.remoteName = undefined;
+      await st.workspaces.remove(far);
       await vscode.commands.executeCommand('gannet.removeWorkspace', { kind: 'workspace', path: extra });
       assert.ok(!st.workspaces.list().includes(extra));
       assert.ok(fs.existsSync(extra), 'nothing deleted');

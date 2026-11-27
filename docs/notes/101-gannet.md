@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, Reveal that works in a remote window) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -322,11 +322,15 @@ GANNET                               [+ account] [⟳]
 - **One view, a webview,** like Perch's Sessions panel. With one view in the container, VS Code merges its
   header into the **GANNET** title, so there is no header row; **+ account** and **⟳** sit in that title. *(Sean)*
 - **On top, the workspace directories** as a small configuration panel, not a tree: one row per directory (`~` for
-  home, full path as tooltip), with **Reveal** (in the system's file manager) and **✕ Remove from list** buttons
+  home, full path as tooltip), with **Reveal** and **✕ Remove from list** buttons
   that show on hover, **Missing** on a directory that is gone (Reveal is not offered there), and an **Add folder…**
   row at the end. A thin line separates it from the owners. *(Sean: "a little configuration panel on top")* The
   rules are 0.3.0's: a git repo is refused, removing deletes nothing, the list is per machine. *(builder's calls on
   the layout)*
+- **Reveal** shows the directory in VS Code's Explorer when it is one of the window's folders or inside one (seclab's
+  `~`); otherwise in the system's file manager. A remote window (Remote-SSH) has no file manager to open, so there a
+  directory outside the window's folders has no Reveal button, and the panel redraws its buttons when the window's
+  folders change. *(Sean: "reveal in file manager does not do anything" on seclab; he chose "Explorer, else hide")*
 - **Below, the owners are the top-level rows,** with everything under them as 0.3.0's tree: an owner's
   recent repos, then All repos; under a repo its checkouts, folders and files; the same labels, descriptions, tooltips and expanded-at-start rules. *(Sean)*
 - **Icons:**

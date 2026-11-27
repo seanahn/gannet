@@ -23,9 +23,11 @@ assert.ok(!P.rowHtml({ id: 'c', label: '/git/perch', hasChildren: true, contextV
 assert.ok(P.rowHtml({ id: 'r', label: 'x', hasChildren: true }, 0, { loading: true }).includes(P.ICONS.loading));
 assert.ok(P.rowHtml({ id: 'r', label: 'perch', icon: { id: 'github-alt', color: 'charts.green' }, hasChildren: true }, 0, {}).includes('green'));
 assert.ok(P.rowHtml({ id: 'r', label: 'x', icon: { id: 'no-such-icon' }, hasChildren: false }, 0, {}).includes('x'), 'an unknown icon draws nothing');
-const ws = P.workspacesHtml([{ path: '/git', label: '/git', missing: false }, { path: '/old', label: '~/old', missing: true }]);
+// Reveal only where the extension says it can show the directory (a remote one outside the window cannot)
+const ws = P.workspacesHtml([{ path: '/git', label: '/git', missing: false, reveal: true }, { path: '/far', label: '~/far', missing: false, reveal: false },
+  { path: '/old', label: '~/old', missing: true, reveal: false }]);
 assert.strictEqual((ws.match(/data-act="reveal"/g) || []).length, 1);
-assert.strictEqual((ws.match(/data-act="remove"/g) || []).length, 2);
+assert.strictEqual((ws.match(/data-act="remove"/g) || []).length, 3);
 assert.ok(ws.includes('Missing') && ws.includes('Add folder…'));
 // visible rows and keys
 const R = (id, hasChildren = true) => ({ id, label: id, hasChildren });

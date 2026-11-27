@@ -7,8 +7,8 @@ const { createRowStore } = require('./rows.js');
 const { pageHtml } = require('./page.js');
 
 class GannetSidebar {
-  constructor({ vscode, tree, workspaces, home, extensionUri }) {
-    Object.assign(this, { vscode, tree, workspaces, home, extensionUri });
+  constructor({ vscode, tree, workspaces, home, extensionUri, canReveal = () => true }) {
+    Object.assign(this, { vscode, tree, workspaces, home, extensionUri, canReveal });
     this.store = createRowStore(tree);
     this.view = null;
     tree.onDidChangeTreeData(() => { this.store.clear(); this.post({ type: 'reset' }); });
@@ -31,7 +31,10 @@ class GannetSidebar {
   post(m) { if (this.view) this.view.webview.postMessage(m); }
 
   workspaceItems() {
-    return this.workspaces.list().map((p) => ({ path: p, label: W.tilde(p, this.home), missing: !W.exists(p) }));
+    return this.workspaces.list().map((p) => {
+      const missing = !W.exists(p);
+      return { path: p, label: W.tilde(p, this.home), missing, reveal: !missing && !!this.canReveal(p) };
+    });
   }
 
   refreshWorkspaces() { this.post({ type: 'workspaces', items: this.workspaceItems() }); }

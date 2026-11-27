@@ -137,7 +137,7 @@ function fakeVscode(opts = {}) {
       registerCommand: (id, fn) => { rec.commands.set(id, fn); return { dispose() {} }; },
       executeCommand: async (id, ...args) => { rec.executed.push({ id, args }); if (rec.commands.has(id)) return rec.commands.get(id)(...args); return undefined; },
     },
-    env: { openExternal: async (uri) => { rec.opened.push(String(uri)); return true; } },
+    env: { openExternal: async (uri) => { rec.opened.push(String(uri)); return true; }, get remoteName() { return opts.remoteName; } },
   };
   /** Shows a registered webview view: the provider resolves a fake view; _send hands it a message and waits. */
   vs._resolveView = (id) => {

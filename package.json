@@ -127,7 +127,7 @@
       },
       {
         "command": "gannet.revealWorkspace",
-        "title": "Reveal in File Manager",
+        "title": "Reveal",
         "category": "Gannet"
       },
       {
