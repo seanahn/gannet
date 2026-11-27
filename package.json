@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "check": "for f in src/*.js bin/*.js media/*.js; do [ ! -f \"$f\" ] || node --check \"$f\" || exit 1; done",
-    "test:offline": "node test/github.test.js && node test/accounts.test.js && node test/state.test.js && node test/workspaces.test.js && node test/checkout.test.js && node test/tokenServer.test.js && node test/fsProvider.test.js && node test/tree.test.js && node test/rows.test.js && node test/page.test.js && node test/sidebar.test.js && node test/host.test.js",
+    "test:offline": "node test/newFolders.test.js && node test/github.test.js && node test/accounts.test.js && node test/state.test.js && node test/workspaces.test.js && node test/checkout.test.js && node test/tokenServer.test.js && node test/fsProvider.test.js && node test/tree.test.js && node test/rows.test.js && node test/page.test.js && node test/sidebar.test.js && node test/host.test.js",
     "test": "npm run -s test:offline && node test/live.test.js"
   },
   "main": "./src/extension.js",
