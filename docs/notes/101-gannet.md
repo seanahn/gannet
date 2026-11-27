@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye, a Hidden row to show them again) built, 2026-11-27; 0.5.2 (a spinning Loading repos… row until the first rows come, no lone Add folder… before the workspace list, no "private", a smaller eye) built, 2026-11-27. 0.5.3 (the sidebar titled GitHub) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye, a Hidden row to show them again) built, 2026-11-27; 0.5.2 (a spinning Loading repos… row until the first rows come, no lone Add folder… before the workspace list, no "private", a smaller eye) built, 2026-11-27. 0.5.3 (the sidebar titled GitHub) built, 2026-11-27; 0.5.4 (the cat in the activity bar) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -56,7 +56,9 @@ Same setup as Perch, all builder's calls Sean has not objected to:
 
 ## What the user sees
 
-Its own icon in the activity bar, **Gannet**, holding one tree view.
+Its own icon in the activity bar holding one tree view: since 0.5.4 the GitHub cat the rows use (codicon github-alt
+without its circle), titled **GitHub** (*Sean: "i can't use the cat icon for the gannet icon in the activity bar?"*);
+until then a diving gannet titled **Gannet**.
 
 ```
 GANNET                                   [+ account] [⟳]

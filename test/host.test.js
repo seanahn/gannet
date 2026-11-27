@@ -487,6 +487,12 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
     assert.ok(!manifest.contributes.configuration.properties['gannet.checkoutFolder'], 'retired');
     // the sidebar's title says what it shows, GitHub, not the extension's name (Sean)
     assert.strictEqual(manifest.contributes.viewsContainers.activitybar.find((c) => c.id === 'gannet').title, 'GitHub');
+    // its activity-bar icon is the cat the rows use (codicon github-alt without its circle), not a gannet
+    {
+      const bar = manifest.contributes.viewsContainers.activitybar.find((c) => c.id === 'gannet');
+      const svg = fs.readFileSync(path.join(__dirname, '..', bar.icon), 'utf8');
+      assert.ok(svg.includes(require('../media/page.js').ICONS['github-alt'].match(/d="([^"]+)"/)[1]), bar.icon);
+    }
     // 0.4.0: one webview view; right-click menus on its rows; title buttons on it
     assert.deepStrictEqual(manifest.contributes.views.gannet, [{ type: 'webview', id: 'gannet.main', name: '' }]);
     assert.ok(!('view/item/context' in manifest.contributes.menus));

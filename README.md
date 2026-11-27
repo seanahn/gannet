@@ -6,7 +6,7 @@ account it came from.
 
 ## What you see
 
-A **Gannet** icon in the activity bar opens one sidebar: the directories you keep checkouts in on top, and your
+A **GitHub** cat icon in the activity bar opens one sidebar: the directories you keep checkouts in on top, and your
 repos, grouped by owner, below.
 
 ```
