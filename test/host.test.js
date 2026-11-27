@@ -409,10 +409,16 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
       // typed in place in the sidebar: the name comes with the command, no input box; the page asks for the check
       const nBoxes = rec.inputBoxes.length;
       opts.quickPick = pickOwner('c3-e');
-      await vscode.commands.executeCommand('gannet.newFolder', { path: wsN, name: 'inplace' });
+      const nPicks = rec.quickPicks.length;
+      await vscode.commands.executeCommand('gannet.newFolder', { path: wsN, name: 'inplace', owner: 'c3-e', account: 'seanahn' });
       assert.strictEqual(rec.inputBoxes.length, nBoxes);
+      assert.strictEqual(rec.quickPicks.length, nPicks, 'the owner was picked in place');
+      assert.deepStrictEqual(nf().find((r) => r.path === path.join(wsN, 'inplace')), { path: path.join(wsN, 'inplace'), owner: 'c3-e', account: 'seanahn' });
       assert.ok(nf().some((r) => r.path === path.join(wsN, 'inplace')));
       const view = vscode._resolveView('gannet.main');
+      await view._send({ type: 'listOwners' });
+      assert.deepStrictEqual(view._posted.at(-1).items.map((i) => [i.owner, i.account, i.description]),
+        [['c3-e', 'seanahn', 'via seanahn'], ['c3-e', 'vsuser', 'via vsuser'], ['seanahn', 'seanahn', null], ['seanahn', 'vsuser', 'via vsuser'], ['vsuser', 'vsuser', null]]);
       await view._send({ type: 'checkName', path: wsN, name: 'inplace' });
       assert.deepStrictEqual(view._posted.at(-1), { type: 'nameCheck', path: wsN, name: 'inplace', message: 'inplace is already under an owner.', error: true });
       fs.mkdirSync(path.join(wsN, 'plain'));

@@ -62,7 +62,7 @@ plus `~/github` if it exists. The design, with the reasons behind each rule:
 
 For a repo that is not on GitHub yet (often a work repo that only the git admins can create), hover a workspace
 directory and click **New Folder…**. Type a name in the box that opens under it (Enter to take it, Escape to
-cancel), then pick the owner it is meant for; Gannet creates the folder,
+cancel), then pick the owner it is meant for from the list that opens in the same place; Gannet creates the folder,
 adds it to the window, and shows it as a dim row first under that owner, "not on GitHub yet". A name that is
 already a plain folder there is adopted, not created. Gannet never runs git in it; it only records which owner the
 folder belongs to, on this machine.

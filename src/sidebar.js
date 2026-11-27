@@ -76,8 +76,17 @@ class GannetSidebar {
         if (m.act === 'add') await cmd('gannet.addWorkspace');
         else if (m.act === 'remove' && m.path) await cmd('gannet.removeWorkspace', { path: m.path });
         else if (m.act === 'reveal' && m.path) await cmd('gannet.revealWorkspace', { path: m.path });
-        else if (m.act === 'create' && m.path && typeof m.name === 'string') await cmd('gannet.newFolder', { path: m.path, name: m.name });
+        else if (m.act === 'create' && m.path && typeof m.name === 'string') {
+          const to = typeof m.owner === 'string' && typeof m.account === 'string' ? { owner: m.owner, account: m.account } : {};
+          await cmd('gannet.newFolder', { path: m.path, name: m.name, ...to });
+        }
         return;
+      case 'listOwners': {   // the owners a new folder can go under: the owner rows the tree shows
+        if (!this.tree.owners) return;
+        const items = (await this.tree.owners()).map((o) => ({ owner: o.owner, account: o.account.login, description: o.own ? null : `via ${o.account.login}` }));
+        this.post({ type: 'ownerChoices', items });
+        return;
+      }
       case 'checkName': {   // the name typed in place, checked as it is typed
         if (!this.checkName || !m.path || typeof m.name !== 'string') return;
         const c = this.checkName(m.path, m.name);

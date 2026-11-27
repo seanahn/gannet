@@ -62,9 +62,14 @@
   /** The workspace panel: one row per directory with its hover buttons, then Add folder…. While a new folder is
    *  being named, its name box (and the check's message) sits under that directory's row, as Explorer's does. */
   function workspacesHtml(items, naming = null) {
+    const picking = naming && naming.step === 'owner';
+    const choices = () => (naming.owners == null ? '<div class="hint info">Loading owners…</div>'
+      : !naming.owners.length ? '<div class="hint error">No GitHub owner to put it under: add an account first.</div>'
+      : `<div class="hint info">Put ${esc(naming.name)} under…</div>` + naming.owners.map((o, i) => `<div class="ws pick${i === naming.sel ? ' sel' : ''}" data-i="${i}">`
+        + `<span class="lic">${o.description ? ICONS.organization : ICONS.account}</span><span class="label">${esc(o.owner)}</span>${o.description ? `<span class="desc">${esc(o.description)}</span>` : ''}</div>`).join(''));
     const box = (w) => (!naming || naming.path !== w.path ? ''
-      : `<div class="ws naming"><span class="lic">${ICONS['new-folder']}</span><input class="name" type="text" spellcheck="false" value="${esc(naming.name)}" aria-label="New folder name"></div>`
-        + (naming.message ? `<div class="hint ${naming.error ? 'error' : 'info'}">${esc(naming.message)}</div>` : ''));
+      : `<div class="ws naming"><span class="lic">${ICONS['new-folder']}</span><input class="name" type="text" spellcheck="false" value="${esc(naming.name)}"${picking ? ' readonly' : ''} aria-label="New folder name"></div>`
+        + (picking ? choices() : naming.message ? `<div class="hint ${naming.error ? 'error' : 'info'}">${esc(naming.message)}</div>` : ''));
     return items.map((w) => `<div class="ws${w.missing ? ' missing' : ''}" data-path="${esc(w.path)}" title="${esc(w.path)}">`
       + `<span class="label">${esc(w.label)}</span>${w.missing ? '<span class="desc">Missing</span>' : ''}<span class="acts">`
       + (w.missing ? '' : `<button class="act" data-act="newFolder" title="New Folder…">${ICONS['new-folder']}</button>`)
@@ -159,6 +164,9 @@
   window.addEventListener('message', (e) => {
     const m = e.data || {};
     if (m.type === 'workspaces') { wsItems = m.items || []; render(); }
+    else if (m.type === 'ownerChoices') {
+      if (naming && naming.step === 'owner') { naming.owners = m.items || []; naming.sel = 0; drawWs(); }
+    }
     else if (m.type === 'nameCheck') {   // only the answer for what is in the box now
       if (naming && naming.path === m.path && naming.name === m.name) { naming.message = m.name ? m.message : null; naming.error = !!m.error; drawWs(); }
     }
@@ -222,6 +230,8 @@
   $tree.addEventListener('dragend', () => { dragId = null; clearDrop(); });
 
   $ws.addEventListener('click', (e) => {
+    const pick = e.target.closest('.ws.pick');
+    if (pick) { choose(Number(pick.dataset.i)); return; }
     const act = e.target.closest('[data-act]');
     if (!act) return;
     if (act.dataset.act === 'add') { vscode.postMessage({ type: 'ws', act: 'add' }); return; }
@@ -231,7 +241,7 @@
   });
 
   $ws.addEventListener('input', (e) => {
-    if (!naming || !e.target.matches('input.name')) return;
+    if (!naming || naming.step === 'owner' || !e.target.matches('input.name')) return;
     naming.name = e.target.value;
     if (!naming.name) { naming.message = null; naming.error = false; drawWs(); return; }
     vscode.postMessage({ type: 'checkName', path: naming.path, name: naming.name });
@@ -239,13 +249,28 @@
   $ws.addEventListener('keydown', (e) => {
     if (!naming || !e.target.matches('input.name')) return;
     if (e.key === 'Escape') { e.preventDefault(); endNaming(); return; }
+    if (naming.step === 'owner') {
+      const n = (naming.owners || []).length;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (n) { naming.sel = (naming.sel + (e.key === 'ArrowDown' ? 1 : n - 1)) % n; drawWs(); } return; }
+      if (e.key === 'Enter') { e.preventDefault(); choose(naming.sel); }
+      return;
+    }
     if (e.key !== 'Enter') return;
     e.preventDefault();
     if (!naming.name.trim() || naming.error) return;   // the message says why
+    Object.assign(naming, { step: 'owner', owners: null, sel: 0, message: null });
+    drawWs();
+    vscode.postMessage({ type: 'listOwners' });
+  });
+  function choose(i) {
+    const o = naming && naming.owners && naming.owners[i];
+    if (!o) return;
     const { path, name } = naming;
     naming = null; drawWs();
-    vscode.postMessage({ type: 'ws', act: 'create', path, name });
-  });
+    vscode.postMessage({ type: 'ws', act: 'create', path, name, owner: o.owner, account: o.account });
+  }
+  // a click on an owner picks it; the name box keeps the focus, so the click is not a click away
+  $ws.addEventListener('mousedown', (e) => { if (e.target.closest('.ws.pick')) e.preventDefault(); });
   // clicking elsewhere cancels, as in Explorer's name box; a redraw replacing the box is not a click away
   $ws.addEventListener('focusout', (e) => {
     if (!e.target.matches || !e.target.matches('input.name')) return;

@@ -69,6 +69,17 @@ assert.ok(!nm.includes('class="hint'));
 assert.ok(P.workspacesHtml(two, { path: '/w', name: '..', message: '".." is not a folder name.', error: true }).includes('<div class="hint error">&quot;..&quot; is not a folder name.</div>'));
 assert.ok(P.workspacesHtml(two, { path: '/w', name: 'old', message: 'old exists', error: false }).includes('<div class="hint info">old exists</div>'));
 assert.ok(!P.workspacesHtml(two).includes('<input '), 'no input unless naming');
+// then the owner is picked in place: the name stays shown, the owner rows under it, one selected
+const owners = [{ owner: 'c3-e', account: 'c3-sahn', description: 'via c3-sahn' }, { owner: 'seanahn', account: 'seanahn', description: null }];
+const op = P.workspacesHtml(two, { path: '/git', name: 'newthing', step: 'owner', owners, sel: 1 });
+assert.ok(op.includes('readonly') && op.includes('value="newthing"'), 'the name, kept');
+assert.strictEqual((op.match(/class="ws pick/g) || []).length, 2);
+assert.ok(op.includes('<div class="ws pick" data-i="0"') && op.includes('<div class="ws pick sel" data-i="1"'));
+assert.ok(op.includes('<span class="label">c3-e</span><span class="desc">via c3-sahn</span>'));
+assert.ok(op.includes('<div class="hint info">Put newthing under…</div>'));
+assert.ok(op.indexOf('data-i="1"') < op.indexOf('data-path="/w"'), 'under its own row');
+assert.ok(P.workspacesHtml(two, { path: '/git', name: 'n', step: 'owner', owners: [], sel: 0 }).includes('<div class="hint error">'), 'no owner to put it under');
+assert.ok(P.workspacesHtml(two, { path: '/git', name: 'n', step: 'owner', owners: null, sel: 0 }).includes('Loading owners'), 'while they are read');
 const nfRow = { id: 'o:c3-sahn:c3-e/n:/w/x', label: 'x', hasChildren: true, contextValue: 'newfolder', icon: { id: 'github-alt', color: 'descriptionForeground' } };
 const ownerE = { id: 'o:c3-sahn:c3-e', label: 'c3-e', hasChildren: true, contextValue: 'owner' };
 const ownerS = { id: 'o:seanahn:seanahn', label: 'seanahn', hasChildren: true, contextValue: 'account-vscode' };

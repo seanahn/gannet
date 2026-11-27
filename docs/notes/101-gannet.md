@@ -435,8 +435,10 @@ GANNET                               [+ account] [⟳]
 
 - **New Folder…** is a new hover button on each workspace directory in the panel (not on a Missing one). It opens a
   name box in place, just under that directory's row, as Explorer's New File does (*Sean: "can you do that in
-  place without using vscode's text box on top?"*); Enter takes the name, Escape or clicking away cancels. Then it
-  asks which owner the folder is for (VS Code's quick pick), and creates `<workspace>/<name>`, and shows it under that owner.
+  place without using vscode's text box on top?"*); Enter takes the name, Escape or clicking away cancels. Then, in the same
+  place, it lists the owners the folder can go under, the owner rows the sidebar shows (*Sean: "owner choice in
+  the sidebar too"*): Up/Down and Enter or a click pick one, Escape or clicking away cancels; with no account
+  signed in it says to add one. Then it creates `<workspace>/<name>`, and shows it under that owner.
   *(Sean)*
   - The name is one folder name: not empty, no `/` or `\`, not `.` or `..`. The message under the name box says what
     is wrong as you type, and Enter does nothing until it is fixed. *(builder's call)*
@@ -465,7 +467,7 @@ GANNET                               [+ account] [⟳]
 - **Drag and drop:** a "not on GitHub yet" row can be dragged onto any owner row; owner rows highlight while it is
   over them, and dropping there moves it. Nothing else in the sidebar is draggable or a drop target. *(Sean: "maybe
   drag and drop or a new icon?", then "yes" to both ways)*
-- **Move to Owner…** (right-click): the same quick pick of owners, for the keyboard and for an owner scrolled far
+- **Move to Owner…** (right-click): a quick pick of the same owners (VS Code's, at the top), for the keyboard and for an owner scrolled far
   away. *(Sean)*
 - Moving changes only Gannet's record (the owner and its account, from the row dropped on or picked); the folder
   stays where it is on disk. Dropping on its own row does nothing. *(builder's call)*
@@ -509,7 +511,7 @@ GANNET                               [+ account] [⟳]
    |-- ws newFolder(path) ->|                                   |
    |                        |-- name box in place (checked as typed) |  Escape: nothing
    |                        |   exists? adopt; file/GitHub clone/recorded: refused
-   |                        |-- quick pick: owner row           |  Escape: nothing
+   |                        |-- owner list in place (the owner rows) |  Escape: nothing
    |                        |-- mkdir <ws>/<name> (unless adopted) ->|
    |                        |-- record {path, owner, account} ->|  (before the window changes)
    |                        |-- add to window (unless inside one; refused: the checkout's note)

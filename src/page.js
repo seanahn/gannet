@@ -30,6 +30,9 @@ const CSS = `
   .ws.naming:hover { background: none; }
   input.name { flex: 1; min-width: 0; height: 18px; box-sizing: border-box; font: inherit; color: var(--vscode-input-foreground);
     background: var(--vscode-input-background); border: 1px solid var(--vscode-focusBorder); outline: none; padding: 0 3px; user-select: text; }
+  .ws.pick { padding-left: 30px; }
+  .ws.pick.sel { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+  .ws.pick.sel .desc { color: inherit; opacity: 0.8; }
   .hint { margin: 0 4px 2px 30px; padding: 2px 6px; font-size: 0.92em; line-height: 1.4; white-space: normal; border: 1px solid; }
   .hint.error { background: var(--vscode-inputValidation-errorBackground); border-color: var(--vscode-inputValidation-errorBorder); }
   .hint.info { background: var(--vscode-inputValidation-infoBackground); border-color: var(--vscode-inputValidation-infoBorder); }

@@ -96,8 +96,8 @@ const { GannetSidebar } = require('../src/sidebar.js');
       assert.strictEqual(sb.resolve({ nodeId: aId + '/i:old' }), undefined, 'nor remembered');
     }
     // 0.5.0: New Folder from the panel; a drop moves a new folder onto an owner, and nothing else moves
-    await view._send({ type: 'ws', act: 'create', path: gh, name: 'newthing' });
-    assert.deepStrictEqual(rec.executed.at(-1), { id: 'gannet.newFolder', args: [{ path: gh, name: 'newthing' }] });
+    await view._send({ type: 'ws', act: 'create', path: gh, name: 'newthing', owner: 'c3-e', account: 'c3-sahn' });
+    assert.deepStrictEqual(rec.executed.at(-1), { id: 'gannet.newFolder', args: [{ path: gh, name: 'newthing', owner: 'c3-e', account: 'c3-sahn' }] });
     const nCheck = view._posted.length;
     await view._send({ type: 'checkName', path: gh, name: 'x' });
     assert.strictEqual(view._posted.length, nCheck, 'no checker: no answer');
@@ -110,6 +110,7 @@ const { GannetSidebar } = require('../src/sidebar.js');
         onDidChangeTreeData: () => {},
         getTreeItem: (n) => ({ label: n.owner || (n.rec && 'x') || n.repo.name, collapsibleState: n.kind === 'owner' ? 1 : 0, contextValue: n.kind === 'owner' ? 'owner' : n.kind === 'newFolder' ? 'newfolder' : 'repo-remote' }),
         getChildren: async (n) => (!n ? [ownerA, ownerB] : n === ownerA ? [nfNode, repoNode] : []),
+        owners: async () => [ownerA, ownerB],
       };
       const sb = new GannetSidebar({ vscode, tree: small, workspaces: fx.workspaces, home: fx.home, extensionUri: vscode.Uri.file('/ext'), checkName: (dir, name) => (name === '..' ? { ok: false, message: 'no' } : name === 'old' ? { ok: true, adopt: true } : { ok: true, adopt: false }) });
       vscode.window.registerWebviewViewProvider('gannet.dnd', sb);
@@ -118,6 +119,8 @@ const { GannetSidebar } = require('../src/sidebar.js');
       const [rA, rB] = v._posted.at(-1).rows;
       await v._send({ type: 'expand', id: rA.id });
       const [rNf, rRepo] = v._posted.at(-1).rows;
+      await v._send({ type: 'listOwners' });
+      assert.deepStrictEqual(v._posted.at(-1), { type: 'ownerChoices', items: [{ owner: 'c3-e', account: 'c3-sahn', description: 'via c3-sahn' }, { owner: 'seanahn', account: 'seanahn', description: null }] }, 'the owner rows the tree shows');
       for (const [name, message, error] of [['..', 'no', true], ['old', 'old exists: it will be put under an owner', false], ['fresh', null, false]]) {
         await v._send({ type: 'checkName', path: '/w', name });
         assert.deepStrictEqual(v._posted.at(-1), { type: 'nameCheck', path: '/w', name, message, error });

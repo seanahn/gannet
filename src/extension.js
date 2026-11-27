@@ -217,7 +217,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     const c = nameCheck(dir, name);
     if (!c.ok) { vscode.window.showErrorMessage(`Gannet: ${c.message}`); return; }   // e.g. taken since it was checked
     const p = path.join(dir, name);
-    const to = await pickOwner(`Put ${name} under…`);
+    const to = node.owner && node.account ? { owner: node.owner, account: node.account } : await pickOwner(`Put ${name} under…`);   // picked in place
     if (!to) return;
     if (!c.adopt) {
       try { fs.mkdirSync(p); } catch (e) { vscode.window.showErrorMessage(`Gannet: could not create ${p}: ${e.message}`); return; }
