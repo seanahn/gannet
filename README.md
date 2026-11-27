@@ -35,7 +35,8 @@ GITHUB                               [+ account] [⟳]
   keeps that owner out. Whatever you hid is listed under **Hidden**, the last row (only when something is
   hidden); the open eye on one shows it again.
 - **Recent repos.** Under an owner come up to 10 repos: the ones you opened or checked out in Gannet first, then
-  GitHub's recently pushed. Then **All repos**: every repo of that owner the account can reach. The account's full
+  the ones checked out on this machine, most recently worked on first (the last commit, checkout, pull or staging
+  in that checkout), then GitHub's recently pushed. Then **All repos**: every repo of that owner the account can reach. The account's full
   list is fetched once and kept on disk, so later starts and other windows show it at once; its tooltip says when
   it was fetched. **⟳** marks every list stale, and the next opening fetches it again.
 - **Checked out.** A repo checked out on this machine has a green Octocat, and lists where its checkouts are. One

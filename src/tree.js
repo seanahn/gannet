@@ -187,7 +187,7 @@ class GannetTree {
     const { account, owner } = node;
     const fresh = await this.newFolderNodes(account, owner);
     const known = new Map(this.knownList(account.login).map((r) => [r.fullName, r]));
-    const recent = this.recent.merge(account.login, await this.pushedOf(account.login), known, (r) => same(r.owner, owner));
+    const recent = this.recent.merge(account.login, await this.pushedOf(account.login), known, (r) => same(r.owner, owner), this.local.byActivity());
     return [...fresh, ...recent.map((repo) => ({ kind: 'repo', account, repo })), { kind: 'group', which: 'all', account, owner }];
   }
 

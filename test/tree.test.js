@@ -358,6 +358,24 @@ const S = vscode.TreeItemCollapsibleState;
       // no newFolders: no rows
       assert.ok(!(await make().getChildren(await ownerNode('c3-e'))).some((n) => n.kind === 'newFolder'));
     }
+    // 0.5.6: a repo checked out on this machine ranks ahead of GitHub's pushed order, most recently worked on first
+    {
+      const pushed = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10', 'sec'].map((n) => R('c3-e/' + n));
+      const saved = repoLists['c3-sahn'];
+      repoLists['c3-sahn'] = { orgs: ['c3-e'], pushed, all: pushed };
+      try {
+        const sec = path.join(tmp, 'sec-checkout');
+        fs.mkdirSync(path.join(sec, '.git', 'logs'), { recursive: true });
+        fs.writeFileSync(path.join(sec, '.git', 'logs', 'HEAD'), 'x');
+        const loc = createLocalRepos({ memento: makeMemento(), home });
+        await loc.remember('C3-E/sec', { path: sec });
+        const t3 = make({ local: loc, recent: createRecent(makeMemento()), cache: createRepoCache(fs.mkdtempSync(path.join(tmp, 'cache3-'))) });
+        const kids = await t3.getChildren(await ownerNode('c3-e', t3));
+        const names = kids.filter((n) => n.kind === 'repo').map((n) => n.repo.fullName);
+        assert.strictEqual(names[0], 'c3-e/sec', names.join(' '));
+        assert.strictEqual(names.length, 10);
+      } finally { repoLists['c3-sahn'] = saved; }
+    }
     console.log('TREE OK');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 })().catch((e) => { console.error(e); fs.rmSync(tmp, { recursive: true, force: true }); process.exit(1); });

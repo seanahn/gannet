@@ -40,6 +40,50 @@ const repo = (fullName) => ({ fullName, owner: fullName.split('/')[0], name: ful
   assert.deepStrictEqual(recent.merge('l', [], known, (r) => r.owner === 'c').map((r) => r.fullName), ['c/first'], 'an owner\'s used repo survives 11 others');
 }
 
+// 0.5.6: checkouts on this machine come after the used ones and before GitHub's pushed order (Sean: "i have been
+// mostly working on c3securitytools repo. why doesn't it show up as recent?"), most recently worked on first
+{
+  const recent = createRecent(makeMemento());
+  recent.touch('l', 'a/used');
+  const pushed = ['a/p1', 'a/p2', 'a/sec', 'a/p3', 'a/p4', 'a/p5', 'a/p6', 'a/p7', 'a/p8', 'a/p9', 'a/p10'].map(repo);
+  const known = new Map([['a/used', repo('a/used')], ['a/old', repo('a/old')]]);
+  const local = ['A/SEC', 'a/old', 'a/unlisted', 'b/other'];   // any case; GitHub's spelling is shown
+  assert.deepStrictEqual(recent.merge('l', pushed, known, (r) => r.owner === 'a', local).map((r) => r.fullName),
+    ['a/used', 'a/sec', 'a/old', 'a/p1', 'a/p2', 'a/p3', 'a/p4', 'a/p5', 'a/p6', 'a/p7']);
+  assert.strictEqual(recent.merge('l', pushed, known).length, 10, 'no local list: as before');
+}
+
+// a checkout's last work: the newest of .git/logs/HEAD and .git/index; byActivity orders this machine's checkouts
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gannet-act-'));
+  try {
+    const mk = (name, logs, index) => {
+      const p = path.join(tmp, name);
+      fs.mkdirSync(path.join(p, '.git', 'logs'), { recursive: true });
+      const at = (f, t) => { fs.writeFileSync(f, 'x'); fs.utimesSync(f, t, t); };
+      if (logs) at(path.join(p, '.git', 'logs', 'HEAD'), logs);
+      if (index) at(path.join(p, '.git', 'index'), index);
+      return p;
+    };
+    const day = 86400;
+    const now = Date.now() / 1000;
+    const a = mk('a', now - 5 * day, now - 4 * day);   // index newer than logs: 4 days
+    const b = mk('b', now - 1 * day, null);            // a commit yesterday
+    const c = mk('c', null, null);                      // nothing yet: last
+    const wt = path.join(tmp, 'wt');                    // a worktree: .git is a file naming the real one
+    const real = mk('realgit', now - 2 * day, null);
+    fs.mkdirSync(wt); fs.writeFileSync(path.join(wt, '.git'), `gitdir: ${path.join(real, '.git')}\n`);
+    const local = createLocalRepos({ memento: makeMemento(), home: tmp });
+    await_(local.remember('o/a', { path: a }));
+    await_(local.remember('o/b', { path: b }));
+    await_(local.remember('o/c', { path: c }));
+    await_(local.remember('o/wt', { path: wt }));
+    await_(local.remember('o/gone', { path: path.join(tmp, 'gone') }));
+    assert.deepStrictEqual(local.byActivity(), ['o/b', 'o/wt', 'o/a', 'o/c'], 'gone checkouts left out');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+function await_() { /* memento updates are synchronous in the fake */ }
+
 // the repo list cache: one file per account in Gannet's storage folder
 {
   const { createRepoCache } = require('../src/repoCache.js');

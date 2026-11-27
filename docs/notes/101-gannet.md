@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye, a Hidden row to show them again) built, 2026-11-27; 0.5.2 (a spinning Loading repos… row until the first rows come, no lone Add folder… before the workspace list, no "private", a smaller eye) built, 2026-11-27. 0.5.3 (the sidebar titled GitHub) built, 2026-11-27; 0.5.4 (the cat in the activity bar) built, 2026-11-27; 0.5.5 (New Folder… always shown, Add Workspace…) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye, a Hidden row to show them again) built, 2026-11-27; 0.5.2 (a spinning Loading repos… row until the first rows come, no lone Add folder… before the workspace list, no "private", a smaller eye) built, 2026-11-27. 0.5.3 (the sidebar titled GitHub) built, 2026-11-27; 0.5.4 (the cat in the activity bar) built, 2026-11-27; 0.5.5 (New Folder… always shown, Add Workspace…) built, 2026-11-27; 0.5.6 (this machine's checkouts in Recent, by local activity) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -176,7 +176,15 @@ GANNET
 - Repo names drop the owner: `c3reliability`, not `c3-e/c3reliability`. *(Sean)*
 - **Each owner node lists its recent repos, then an All repos link** that expands to every repo of that owner the
   account can reach. *(Sean: "per owner")* Recent per owner works as before (repos used in Gannet first, then
-  GitHub's recently pushed list), filtered to that owner, at most 10. All repos is the account's full list,
+  this machine's checkouts by local activity, then GitHub's recently pushed list), filtered to that owner, at most
+  10.
+- **This machine's checkouts rank ahead of GitHub's pushed order (0.5.6).** *(Sean: "i have been mostly working on
+  c3securitytools repo. why doesn't it show up as recent?" — in an organization, other people's pushes filled
+  the 10.)* After the repos used in Gannet come the repos checked out on this machine that GitHub lists, most
+  recently worked on first. "Worked on" is the newest modification time of the checkout's `.git/logs/HEAD`
+  (commits, checkouts, pulls) and `.git/index` (staging, switching); a worktree's `.git` file is followed; a
+  checkout with neither ranks last among them; several checkouts of one repo count by the newest. *(builder's
+  call on the files; Sean agreed to "the latest git activity in the checkout")* All repos is the account's full list,
   fetched once and shared by all its owner nodes, filtered to the owner.
 - **The full list is cached on disk, once read.** Fetching every page takes long for an account that reaches many
   repos, so after the first fetch each account's list is kept in a file in Gannet's global storage and used on
@@ -618,8 +626,9 @@ Calls made while building it *(builder's calls)*:
 Rulings settled while planning the build, all builder's calls:
 
 - VS Code ≥ 1.94, for `vscode.authentication.getAccounts`.
-- Recent merges the repos used in Gannet (most recent first, only those GitHub still lists) with GitHub's
-  `sort=pushed` list, without duplicates, at most 10.
+- Recent merges the repos used in Gannet (most recent first, only those GitHub still lists), then this machine's
+  checkouts by local git activity (only those GitHub lists, matched ignoring case), then GitHub's `sort=pushed`
+  list, without duplicates, at most 10.
 - A folder of more than 1,000 entries (GitHub's contents API limit) ends with an item **More files — open on
   GitHub**. An empty repo expands to **Empty repository** and can still be checked out. Submodules and symlinks
   do not expand; a submodule opens its repo on GitHub.

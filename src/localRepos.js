@@ -27,15 +27,33 @@ function originOf(dir) {
   return m ? m[1] : '';
 }
 
+/** A checkout's git directory: .git, or where a worktree's .git file points; '' when unreadable. */
+function gitDirOf(dir) {
+  try {
+    const gitDir = path.join(dir, '.git');
+    if (!fs.statSync(gitDir).isFile()) return gitDir;
+    const m = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(gitDir, 'utf8'));
+    return m ? path.resolve(dir, m[1].trim()) : '';
+  } catch { return ''; }
+}
+
+/** When a checkout was last worked on, in ms: the newest of .git/logs/HEAD (commits, checkouts, pulls) and .git/index
+ *  (staging, switching); 0 when neither exists. */
+function activityOf(dir) {
+  const gitDir = gitDirOf(dir);
+  if (!gitDir) return 0;
+  let t = 0;
+  for (const f of [path.join(gitDir, 'logs', 'HEAD'), path.join(gitDir, 'index')]) {
+    try { t = Math.max(t, fs.statSync(f).mtimeMs); } catch { /* not there */ }
+  }
+  return t;
+}
+
 /** The checked-out branch, 'detached at <sha7>', or '' when unreadable; a worktree's .git file is followed. */
 function branchOf(dir) {
   try {
-    let gitDir = path.join(dir, '.git');
-    if (fs.statSync(gitDir).isFile()) {
-      const m = /^gitdir:\s*(.+)$/m.exec(fs.readFileSync(gitDir, 'utf8'));
-      if (!m) return '';
-      gitDir = path.resolve(dir, m[1].trim());
-    }
+    const gitDir = gitDirOf(dir);
+    if (!gitDir) return '';
     const head = fs.readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim();
     const ref = /^ref:\s*refs\/heads\/(.+)$/.exec(head);
     if (ref) return ref[1];
@@ -67,6 +85,15 @@ function createLocalRepos({ memento, home = os.homedir() }) {
     /** This repo's checkouts still on disk, in the order remembered. */
     checkoutsOf: (fullName) => (load()[keyOf(fullName)] || []).filter((c) => isDir(c.path)),
     all: () => new Map(Object.entries(load())),
+    /** The repos checked out on this machine (lowercased full names), most recently worked on first. */
+    byActivity() {
+      const out = [];
+      for (const [k, list] of Object.entries(load())) {
+        const on = list.filter((c) => isDir(c.path));
+        if (on.length) out.push([k, Math.max(...on.map((c) => activityOf(c.path)))]);
+      }
+      return out.sort((a, b) => b[1] - a[1]).map(([k]) => k);
+    },
     remember(fullName, e) {
       const all = load();
       const list = all[keyOf(fullName)] || [];
@@ -106,4 +133,4 @@ function createLocalRepos({ memento, home = os.homedir() }) {
   };
 }
 
-module.exports = { createLocalRepos, parseOrigin, originOf, branchOf, expandHome, isDir, PARTIAL, partialOf, alive };
+module.exports = { activityOf, createLocalRepos, parseOrigin, originOf, branchOf, expandHome, isDir, PARTIAL, partialOf, alive };
