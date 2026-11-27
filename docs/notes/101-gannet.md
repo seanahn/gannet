@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) designed, not built. How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -523,6 +523,14 @@ GANNET                               [+ account] [⟳]
    |   (mkdir fails: name taken since the check, no permission: an error message, no record, nothing added)
    |   (folder gone from disk: record dropped quietly, no row)
 ```
+
+Calls made while building it *(builder's calls)*:
+
+- A folder that turns into a checkout redraws the tree at once; the sidebar drops the answer already on its way and
+  the page asks again, so a dim row never lingers beside the green one.
+- **Move to Owner…** leaves the folder's own owner row out of the pick.
+- The name box already says no to a folder that is recorded under an owner, as well as after Enter.
+- ⟳ rescans every listed workspace for clones, so one made by hand since VS Code started shows without a reload.
 
 ## Checkout
 

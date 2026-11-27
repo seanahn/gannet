@@ -58,6 +58,19 @@ clones. Upgrading from 0.2.0 carries its list over once, with each workspace fil
 plus `~/github` if it exists. The design, with the reasons behind each rule:
 [docs/notes/101-gannet.md](docs/notes/101-gannet.md).
 
+## New folders
+
+For a repo that is not on GitHub yet (often a work repo that only the git admins can create), hover a workspace
+directory and click **New Folder…**. Type a name, then pick the owner it is meant for; Gannet creates the folder,
+adds it to the window, and shows it as a dim row first under that owner, "not on GitHub yet". A name that is
+already a plain folder there is adopted, not created. Gannet never runs git in it; it only records which owner the
+folder belongs to, on this machine.
+
+Drag the row onto another owner, or right-click **Move to Owner…**, to move it; right-click **Forget** drops the
+row and keeps the folder. Reveal and Add to Window work on it as on a checkout. Once the folder's origin names a
+repo GitHub lists, it shows as an ordinary checkout under that repo's owner. ⟳ also rescans the workspaces, so a
+clone you made by hand shows up. The design: [docs/notes/101-gannet.md](docs/notes/101-gannet.md).
+
 ## Checking out
 
 **Check Out** (the cloud icon on a repo, or right-click) clones the repo; on a repo already checked out the
