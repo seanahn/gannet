@@ -333,6 +333,17 @@ const S = vscode.TreeItemCollapsibleState;
       const perch = (await t.getChildren(await ownerNode('seanahn', t))).find((n) => n.repo && n.repo.fullName === 'seanahn/perch');
       assert.strictEqual(t.getTreeItem(perch).iconPath.color.id, 'charts.green');
       assert.ok(t.isListed('SEANAHN/perch') && !t.isListed('c3-e/unlisted'));
+      // an older repo only All repos lists: the converted folder shows at the owner's top level, not only inside All repos
+      repoLists['c3-sahn'].all = [R('c3-e/hub'), R('c3-e/old')];
+      const old = mk(path.join(ghW, 'oldone'));
+      fs.mkdirSync(path.join(old, '.git'));
+      fs.writeFileSync(path.join(old, '.git', 'config'), '[remote "origin"]\n\turl = https://github.com/c3-e/old.git\n');
+      await nf.add({ path: old, owner: 'c3-e', account: 'c3-sahn' });
+      const t2 = make({ newFolders: nf, cache: createRepoCache(fs.mkdtempSync(path.join(tmp, 'cache2-'))) });   // not the kept list of earlier blocks
+      await t2.fullList('c3-sahn');
+      await t2.getChildren(await ownerNode('c3-e', t2));
+      const top = await t2.getChildren(await ownerNode('c3-e', t2));
+      assert.ok(top.some((n) => n.kind === 'repo' && n.repo.fullName === 'c3-e/old'), top.map((n) => n.kind + ':' + (n.repo ? n.repo.fullName : '')).join(' '));
       // no newFolders: no rows
       assert.ok(!(await make().getChildren(await ownerNode('c3-e'))).some((n) => n.kind === 'newFolder'));
     }

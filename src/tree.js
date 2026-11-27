@@ -142,11 +142,14 @@ class GannetTree {
   }
 
   /** Whether GitHub lists this repo for any account, as far as read: recently pushed, or a kept All repos list. */
-  isListed(fullName) {
-    const hit = (list) => (list || []).some((r) => same(r.fullName, fullName));
-    for (const list of this.pushed.values()) if (hit(list)) return true;
-    for (const login of new Set([...this.pushed.keys(), ...this.full.keys()])) if (hit(this.knownList(login))) return true;
-    return false;
+  isListed(fullName) { return !!this.listedBy(fullName); }
+
+  /** The repo as an account's list names it (its exact spelling) and that login, or null. */
+  listedBy(fullName) {
+    const hit = (list) => (list || []).find((r) => same(r.fullName, fullName));
+    for (const [login, list] of this.pushed) { const r = hit(list); if (r) return { login, fullName: r.fullName }; }
+    for (const login of new Set([...this.pushed.keys(), ...this.full.keys()])) { const r = hit(this.knownList(login)); if (r) return { login, fullName: r.fullName }; }
+    return null;
   }
 
   /** This owner row's folders not on GitHub yet. A folder gone is forgotten; one whose origin GitHub lists becomes a
@@ -158,9 +161,11 @@ class GannetTree {
     for (const rec of this.newFolders.forRow(owner, account.login)) {
       if (!isDir(rec.path)) { await this.newFolders.forget(rec.path); continue; }
       const full = parseOrigin(originOf(rec.path));
-      if (full && this.isListed(full)) {
+      const listed = full && this.listedBy(full);
+      if (listed) {
         await this.newFolders.forget(rec.path);
         await this.local.remember(full, { path: rec.path });
+        await this.recent.touch(listed.login, listed.fullName);   // at its owner's top level, even when old
         moved = true;
         continue;
       }

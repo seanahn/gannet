@@ -92,13 +92,17 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
     const r = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, canSelectMany: false, openLabel, title });
     return r && r[0] ? r[0].fsPath : undefined;
   };
-  const reveal = async (p) => vscode.commands.executeCommand(inWorkspace(p) ? 'revealInExplorer' : 'revealFileInOS', vscode.Uri.file(p));
   const within = (p, dir) => { const r = path.relative(dir, p); return !r.startsWith('..') && !path.isAbsolute(r); };   // or equal
   const windowFolders = () => (vscode.workspace.workspaceFolders || []).filter((f) => f.uri.scheme === 'file').map((f) => f.uri.fsPath);
 
   // shown in VS Code's Explorer when inside the window's folders; else the OS file manager, which a remote window lacks
   const inWindow = (p) => windowFolders().some((d) => within(p, d));
   const canReveal = (p) => inWindow(p) || !vscode.env.remoteName;
+  const reveal = async (p) => {
+    if (inWindow(p)) return vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(p));
+    if (!vscode.env.remoteName) return vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(p));
+    vscode.window.showInformationMessage(`${p} is not in this window; Add to Window to see it in the Explorer.`);
+  };
 
   // a finished checkout goes into this window, unless it already shows inside one of its folders (seclab's ~/)
   const place = (p) => (windowFolders().some((d) => within(p, d)) ? true : addToWorkspace(p));

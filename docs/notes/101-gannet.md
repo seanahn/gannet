@@ -529,6 +529,10 @@ Calls made while building it *(builder's calls)*:
 - A folder that turns into a checkout redraws the tree at once; the sidebar drops the answer already on its way and
   the page asks again, so a dim row never lingers beside the green one.
 - **Move to Owner…** leaves the folder's own owner row out of the pick.
+- A folder that turns into a checkout of an older repo, one only All repos lists, is counted as used, so it shows at
+  its owner's top level rather than only inside All repos.
+- Reveal on a row (a new folder or a checkout) shows it in the Explorer when it is inside the window's folders, else
+  in the file manager; in a remote window, which has none, it says to Add to Window instead.
 - The name box already says no to a folder that is recorded under an owner, as well as after Enter.
 - ⟳ rescans every listed workspace for clones, so one made by hand since VS Code started shows without a reload.
 

@@ -423,6 +423,17 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
       await vscode.commands.executeCommand('gannet.revealLocal', { kind: 'newFolder', owner: 'seanahn', account: { login: 'seanahn' }, rec: nf()[0] });
       assert.strictEqual(rec.executed.at(-1).args[0].fsPath, path.join(wsN, 'old'));
 
+      // in a remote window: inside a window folder, the Explorer; outside, no file manager to call, a message
+      opts.remoteName = 'ssh-remote';
+      opts.folders = [hN];
+      await vscode.commands.executeCommand('gannet.revealLocal', { kind: 'newFolder', owner: 'seanahn', account: { login: 'seanahn' }, rec: nf()[0] });
+      assert.deepStrictEqual([rec.executed.at(-1).id, rec.executed.at(-1).args[0].fsPath], ['revealInExplorer', path.join(wsN, 'old')]);
+      opts.folders = [path.join(tmp, 'ws')];
+      const nExec = rec.executed.length, nMsg = rec.messages.length;
+      await vscode.commands.executeCommand('gannet.revealLocal', { kind: 'newFolder', owner: 'seanahn', account: { login: 'seanahn' }, rec: nf()[0] });
+      assert.strictEqual(rec.executed.length, nExec + 1, 'no revealFileInOS in a remote window');
+      assert.strictEqual(rec.messages.length, nMsg + 1);
+      opts.remoteName = undefined;
       // ⟳ rescans: a clone made by hand after start is found
       sh(`git clone -q "${bare}" later && git -C later remote set-url origin https://github.com/seanahn/later.git`, wsN);
       assert.strictEqual(st.local.checkoutsOf('seanahn/later').length, 0);
