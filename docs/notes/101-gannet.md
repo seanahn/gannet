@@ -105,7 +105,7 @@ GANNET                                   [+ account] [⟳]
 
 ### A repo node
 
-- Label `owner/name`; description shows **● local** when checked out, and **private** / **archived** when so.
+- Label `owner/name`; description shows **● local** when checked out, and **archived** when so (**private** too until 0.5.2).
 - Expanding a repo that is only on GitHub lists its root from GitHub; expanding a subfolder fetches that folder
   only then (`GET /repos/{owner}/{repo}/contents/{path}` on the default branch), cached for the session.
 - Expanding a checked-out repo lists the files **on disk** instead, editable like any local file. *(guess Sean
@@ -296,6 +296,10 @@ so VS Code drew a header row above each: the owners sat under a `∨` row even w
 panel on top, then, trees below", pointing at Perch's Sessions panel)* Where this section and the sections above
 disagree on how things look, this section wins; everything about what the tree holds, the checkout flow, caching
 and workspaces stays as 0.3.0 describes.
+
+**Loading (0.5.2).** Until the first rows come (GitHub is asked for every account first) the tree shows a spinning
+**Loading repos…** row, and again after ⟳; the workspace panel stays empty until its list comes, never a lone
+**Add folder…**. *(Sean: "no indication of the trees are being loaded up")*
 
 ```
 GANNET                               [+ account] [⟳]
