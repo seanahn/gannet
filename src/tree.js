@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { labelOf, tilde } = require('./workspaces.js');
 const { toUri } = require('./fsProvider.js');
-const { branchOf } = require('./localRepos.js');
+const { branchOf, parseOrigin, originOf, isDir } = require('./localRepos.js');
 
 const LARGE = 10 * 1024 * 1024;
 const PUSHED_PAGE = 100;   // Recent's pool from GitHub: one page of the recently pushed repos
@@ -38,8 +38,9 @@ const checkoutLine = (c) => [c.path, branchOf(c.path), c.login && `pushes as ${c
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();   // GitHub names ignore case
 
 class GannetTree {
-  constructor({ vscode, accounts, clientFor, recent, local, cache, workspaces, home, hiddenOwners = () => [] }) {
+  constructor({ vscode, accounts, clientFor, recent, local, cache, workspaces, home, hiddenOwners = () => [], newFolders = null }) {
     this.hiddenOwners = hiddenOwners;
+    this.newFolders = newFolders;
     Object.assign(this, { vscode, accounts, clientFor, recent, local, cache, workspaces, home });
     this.changed = new vscode.EventEmitter();
     this.onDidChangeTreeData = this.changed.event;
@@ -69,6 +70,7 @@ class GannetTree {
         case 'repo': return await this.repoChildren(node);
         case 'entry': return await this.remoteDir(node.account, node.repo, node.entry.path);
         case 'checkout': return this.diskDir(node.checkout.path);
+        case 'newFolder': return this.diskDir(node.rec.path);
         case 'disk': return this.diskDir(node.path);
         default: return [];
       }
@@ -139,11 +141,41 @@ class GannetTree {
     return out.sort((a, b) => byName(a.owner, b.owner) || byName(a.account.login, b.account.login));
   }
 
+  /** Whether GitHub lists this repo for any account, as far as read: recently pushed, or a kept All repos list. */
+  isListed(fullName) {
+    const hit = (list) => (list || []).some((r) => same(r.fullName, fullName));
+    for (const list of this.pushed.values()) if (hit(list)) return true;
+    for (const login of new Set([...this.pushed.keys(), ...this.full.keys()])) if (hit(this.knownList(login))) return true;
+    return false;
+  }
+
+  /** This owner row's folders not on GitHub yet. A folder gone is forgotten; one whose origin GitHub lists becomes a
+   * checkout of that repo (nothing written in it) and the whole tree redraws, so its owner's rows show it. */
+  async newFolderNodes(account, owner) {
+    if (!this.newFolders) return [];
+    const out = [];
+    let moved = false;
+    for (const rec of this.newFolders.forRow(owner, account.login)) {
+      if (!isDir(rec.path)) { await this.newFolders.forget(rec.path); continue; }
+      const full = parseOrigin(originOf(rec.path));
+      if (full && this.isListed(full)) {
+        await this.newFolders.forget(rec.path);
+        await this.local.remember(full, { path: rec.path });
+        moved = true;
+        continue;
+      }
+      out.push({ kind: 'newFolder', account, owner, rec, pending: full });
+    }
+    if (moved) this.redraw();
+    return out;
+  }
+
   async ownerChildren(node) {
     const { account, owner } = node;
+    const fresh = await this.newFolderNodes(account, owner);
     const known = new Map(this.knownList(account.login).map((r) => [r.fullName, r]));
     const recent = this.recent.merge(account.login, await this.pushedOf(account.login), known, (r) => same(r.owner, owner));
-    return [...recent.map((repo) => ({ kind: 'repo', account, repo })), { kind: 'group', which: 'all', account, owner }];
+    return [...fresh, ...recent.map((repo) => ({ kind: 'repo', account, repo })), { kind: 'group', which: 'all', account, owner }];
   }
 
   async everyRepo(node) {
@@ -234,6 +266,15 @@ class GannetTree {
         it.contextValue = !copies.length ? 'repo-remote' : copies.length > 1 ? 'repo-multi' : copies[0].login ? 'repo-local' : 'repo-local-foreign';
         it.tooltip = !copies.length ? 'Only on GitHub' : copies.map(checkoutLine).join('\n');   // Sean: the row already names the repo
         it.iconPath = copies.length ? new vs.ThemeIcon('github-alt', new vs.ThemeColor('charts.green')) : new vs.ThemeIcon('github-alt');
+        return it;
+      }
+      case 'newFolder': {
+        const { rec, pending } = node;
+        const it = new vs.TreeItem(path.basename(rec.path), S.Collapsed);
+        it.description = pending ? `${pending}, not on GitHub yet` : `not on GitHub yet · ${labelOf(rec.path, this.workspaces ? this.workspaces.list() : [], this.home)}`;
+        it.contextValue = 'newfolder';
+        it.tooltip = checkoutLine({ path: rec.path });
+        it.iconPath = new vs.ThemeIcon('github-alt', new vs.ThemeColor('descriptionForeground'));
         return it;
       }
       case 'checkout': {

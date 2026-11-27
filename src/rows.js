@@ -8,6 +8,7 @@ function nodeKey(node) {
     case 'group': return 'all';
     case 'repo': return `r:${node.repo.fullName.toLowerCase()}`;
     case 'checkout': return `c:${node.checkout.path}`;
+    case 'newFolder': return `n:${node.rec.path}`;
     case 'entry': return `e:${node.entry.path}`;
     case 'disk': return `d:${require('path').basename(node.path)}`;
     case 'info': return `i:${node.label}`;

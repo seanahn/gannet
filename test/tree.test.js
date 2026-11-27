@@ -14,6 +14,8 @@ const { createLocalRepos } = require('../src/localRepos.js');
 const { createRepoCache } = require('../src/repoCache.js');
 const { createWorkspaces } = require('../src/workspaces.js');
 const { GannetTree } = require('../src/tree.js');
+const { createNewFolders } = require('../src/newFolders.js');
+const { nodeKey, childIds } = require('../src/rows.js');
 
 const R = (fullName, extra = {}) => ({ fullName, owner: fullName.split('/')[0], name: fullName.split('/')[1], private: false, archived: false, defaultBranch: 'main', htmlUrl: 'https://github.com/' + fullName, cloneUrl: `https://github.com/${fullName}.git`, ...extra });
 const E = (name, type, extra = {}) => ({ name, path: name, type, size: 1, htmlUrl: 'https://github.com/o/r/tree/main/' + name, ...extra });
@@ -275,6 +277,64 @@ const S = vscode.TreeItemCollapsibleState;
       const [acct] = await t.getChildren();
       await t.getChildren(acct);
       assert.deepStrictEqual(forgotten, ['c3-sahn']);
+    }
+
+    // 0.5.0: folders not on GitHub yet show first under the owner row they were put under
+    {
+      repoLists['c3-sahn'] = { orgs: ['c3-e'], pushed: [R('c3-e/hub')], all: [R('c3-e/hub')] };   // signed in again
+      const nf = createNewFolders({ memento: makeMemento() });
+      const ghW = path.join(home, 'github');
+      await workspaces.add(ghW);
+      const mk = (p, files = []) => { fs.mkdirSync(p, { recursive: true }); for (const f of files) fs.writeFileSync(path.join(p, f), 'x'); return p; };
+      const a = mk(path.join(ghW, 'newthing'), ['notes.md']);
+      const b = mk(path.join(home, 'other', 'newthing'));
+      const gone = mk(path.join(ghW, 'gone'));
+      const unlisted = mk(path.join(ghW, 'unlisted'));
+      fs.mkdirSync(path.join(unlisted, '.git'));
+      fs.writeFileSync(path.join(unlisted, '.git', 'config'), '[remote "origin"]\n\turl = https://github.com/c3-e/unlisted.git\n');
+      const pushed = mk(path.join(ghW, 'pushedNow'));
+      fs.mkdirSync(path.join(pushed, '.git'));
+      const cfg = '[remote "origin"]\n\turl = git@github.com:seanahn/perch.git\n';
+      fs.writeFileSync(path.join(pushed, '.git', 'config'), cfg);
+      for (const p of [a, b, gone, unlisted, pushed]) await nf.add({ path: p, owner: 'c3-e', account: 'c3-sahn' });
+      await nf.add({ path: mk(path.join(ghW, 'hiddenOne')), owner: 'nobody', account: 'c3-sahn' });
+      fs.rmSync(gone, { recursive: true });
+      const t = make({ newFolders: nf });
+      let fired = 0;
+      t.onDidChangeTreeData(() => { fired++; });
+      const c3eNode = await ownerNode('c3-e', t);
+      const kids = await t.getChildren(c3eNode);
+      const dim = kids.filter((n) => n.kind === 'newFolder');
+      assert.deepStrictEqual(dim.map((n) => n.rec.path), [a, b, unlisted], 'first, in record order; gone and pushed ones not shown');
+      assert.strictEqual(kids[0].kind, 'newFolder');
+      const ia = t.getTreeItem(dim[0]);
+      assert.strictEqual(ia.label, 'newthing');
+      assert.strictEqual(ia.description, 'not on GitHub yet · ~/github');
+      assert.strictEqual(ia.contextValue, 'newfolder');
+      assert.strictEqual(ia.iconPath.id, 'github-alt');
+      assert.strictEqual(ia.iconPath.color.id, 'descriptionForeground');
+      assert.strictEqual(ia.collapsibleState, S.Collapsed);
+      assert.deepStrictEqual((await t.getChildren(dim[0])).map((n) => t.getTreeItem(n).label), ['notes.md']);
+      // Review Focus 5 and 1: outside every listed workspace, the parent; two of one name, two ids
+      assert.strictEqual(t.getTreeItem(dim[1]).description, 'not on GitHub yet · ~/other');
+      const ids = childIds('o:c3-sahn:c3-e', dim);
+      assert.strictEqual(new Set(ids).size, 2 + 1);
+      assert.notStrictEqual(nodeKey(dim[0]), nodeKey(dim[1]));
+      // a GitHub origin no list has yet: still waiting
+      assert.strictEqual(t.getTreeItem(dim[2]).description, 'c3-e/unlisted, not on GitHub yet');
+      // gone: dropped; listed (Review Focus 4, another owner): becomes a checkout of seanahn/perch, nothing written
+      const left = nf.list().map((r) => r.path);
+      assert.ok(!left.includes(gone) && !left.includes(pushed), JSON.stringify(left));
+      assert.ok(left.includes(unlisted) && left.includes(path.join(ghW, 'hiddenOne')), 'waiting and hidden-owner records kept');
+      assert.deepStrictEqual(local.checkoutsOf('seanahn/perch').filter((c) => c.path === pushed), [{ path: pushed, login: null, byGannet: false }]);
+      assert.strictEqual(fs.readFileSync(path.join(pushed, '.git', 'config'), 'utf8'), cfg, 'nothing written in the folder');
+      assert.strictEqual(fired, 1, 'redrawn once, so every row of seanahn shows it');
+      assert.ok(!(await t.getChildren(await ownerNode('c3-e', t))).some((n) => n.kind === 'newFolder' && n.rec.path === pushed));
+      const perch = (await t.getChildren(await ownerNode('seanahn', t))).find((n) => n.repo && n.repo.fullName === 'seanahn/perch');
+      assert.strictEqual(t.getTreeItem(perch).iconPath.color.id, 'charts.green');
+      assert.ok(t.isListed('SEANAHN/perch') && !t.isListed('c3-e/unlisted'));
+      // no newFolders: no rows
+      assert.ok(!(await make().getChildren(await ownerNode('c3-e'))).some((n) => n.kind === 'newFolder'));
     }
     console.log('TREE OK');
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
