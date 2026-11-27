@@ -16,7 +16,7 @@ GANNET                               [+ account] [⟳]
   + Add folder…
  ───────────────────────────────────────────────
  ▾ (org) c3-e                via c3-sahn
-   ▸ (cat) c3nexus           private · ~
+   ▸ (cat) c3nexus           ~
    ▸ All repos               312
  ▸ (person) c3-sahn
  ▾ (person) seanahn

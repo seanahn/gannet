@@ -89,6 +89,8 @@ for (const cv of ['account-vscode', 'account-gh', 'repo-remote', 'newfolder', 'g
 assert.ok(P.rowHtml({ id: 'hidden/h:bpmn2', label: 'bpmn2', contextValue: 'hidden-owner' }, 1, {}).includes(`<button class="act" data-act="show" title="Show Owner">${P.ICONS.eye}</button>`));
 assert.ok(P.rowHtml({ id: 'hidden/a:x', label: 'x', contextValue: 'hidden-account' }, 1, {}).includes('data-act="show" title="Show Account"'));
 assert.ok(P.ICONS.eye.startsWith('<svg') && P.ICONS.eye !== P.ICONS['eye-closed']);
+// until the first rows arrive (and after ⟳), a spinning Loading… row, not an empty tree
+assert.ok(P.loadingHtml().includes('class="spin"') && P.loadingHtml().includes('Loading repos…'));
 const nfRow = { id: 'o:c3-sahn:c3-e/n:/w/x', label: 'x', hasChildren: true, contextValue: 'newfolder', icon: { id: 'github-alt', color: 'descriptionForeground' } };
 const ownerE = { id: 'o:c3-sahn:c3-e', label: 'c3-e', hasChildren: true, contextValue: 'owner' };
 const ownerS = { id: 'o:seanahn:seanahn', label: 'seanahn', hasChildren: true, contextValue: 'account-vscode' };

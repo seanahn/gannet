@@ -2,7 +2,7 @@
   "name": "gannet",
   "displayName": "Gannet",
   "description": "Your GitHub repos as a tree: browse files without cloning, check out into your workspace, push as the right account.",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "publisher": "seanahn",
   "license": "MIT",
   "repository": {

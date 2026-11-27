@@ -68,7 +68,7 @@ const S = vscode.TreeItemCollapsibleState;
     assert.strictEqual(item((await tree.getChildren(sean)).at(-1)).iconPath.id, 'repos', 'All repos: the two-cat icon the page draws');
     assert.deepStrictEqual(await labels(roots[0]), ['hub', 'All repos'], "c3-e's own, not c3-sahn's");
     const [roostNode, perchNode, allNode] = await tree.getChildren(sean);
-    assert.strictEqual(item(perchNode).description, 'private');
+    assert.ok(!item(perchNode).description, 'no "private" after the name (Sean: "remove the private")');
     assert.strictEqual(item(roostNode).description, 'archived');
     assert.strictEqual(item(perchNode).contextValue, 'repo-remote');
     assert.strictEqual(item(perchNode).iconPath.id, 'github-alt', 'the Octocat without the circle');
@@ -194,7 +194,7 @@ const S = vscode.TreeItemCollapsibleState;
       await local.remember('seanahn/perch', { path: p2, login: null, byGannet: false });
       const perch = { kind: 'repo', account: accountList[1], repo: R('seanahn/perch', { private: true }) };
       const it = item(perch);
-      assert.strictEqual(it.description, `private · ~/github · ${other}`);
+      assert.strictEqual(it.description, `~/github · ${other}`);
       assert.strictEqual(it.iconPath.id, 'github-alt');
       assert.strictEqual(it.iconPath.color.id, 'charts.green');
       assert.strictEqual(it.contextValue, 'repo-multi');
@@ -220,13 +220,13 @@ const S = vscode.TreeItemCollapsibleState;
       // one left: it is the repo's checkout again
       fs.rmSync(p1, { recursive: true });
       assert.strictEqual(item(perch).contextValue, 'repo-local-foreign');
-      assert.strictEqual(item(perch).description, `private · ${other}`);
+      assert.strictEqual(item(perch).description, other);
       assert.deepStrictEqual((await tree.getChildren(perch)).map((n) => item(n).label), ['f.txt']);
       // a checkout outside every workspace shows the folder it sits in
       const lone = path.join(tmp, 'elsewhere', 'perch');
       fs.mkdirSync(lone, { recursive: true });
       await local.remember('seanahn/perch', { path: lone });
-      assert.strictEqual(item(perch).description, `private · ${other} · ${path.join(tmp, 'elsewhere')}`);
+      assert.strictEqual(item(perch).description, `${other} · ${path.join(tmp, 'elsewhere')}`);
     }
 
     // Review Focus 2: an owner spelled two ways is one node

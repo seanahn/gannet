@@ -25,8 +25,8 @@
     close: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
     add: svg('<path d="M8 3v10M3 8h10"/>'),
     'new-folder': svg('<path d="M1.5 3.5h4l1.5 1.5h7.5v8h-13z"/><path d="M8 7.5v4M6 9.5h4"/>'),
-    'eye-closed': svg('<path d="M1.5 5c1.6 2 3.8 3 6.5 3s4.9-1 6.5-3"/><path d="M3.5 7.1L2.3 8.8M6.2 7.9l-.5 2M9.8 7.9l.5 2M12.5 7.1l1.2 1.7"/>'),
-    eye: svg('<path d="M1.5 8c1.6-2.8 3.8-4.2 6.5-4.2s4.9 1.4 6.5 4.2c-1.6 2.8-3.8 4.2-6.5 4.2S3.1 10.8 1.5 8z"/><circle cx="8" cy="8" r="2"/>'),
+    'eye-closed': svg('<path d="M3.5 6.5c1.2 1.4 2.7 2.1 4.5 2.1s3.3-.7 4.5-2.1"/><path d="M5 8.1l-.8 1.1M7 8.6l-.3 1.3M9 8.6l.3 1.3M11 8.1l.8 1.1"/>'),
+    eye: svg('<path d="M3.5 8c1.2-2 2.7-3 4.5-3s3.3 1 4.5 3c-1.2 2-2.7 3-4.5 3s-3.3-1-4.5-3z"/><circle cx="8" cy="8" r="1.4"/>'),
     loading: svg('<path d="M8 2a6 6 0 106 6"/>'),
   };
   // All repos: two of the codicon cats, one behind and above the other
@@ -116,14 +116,17 @@
     }
   }
 
-  const api = { esc, ICONS, rowHtml, workspacesHtml, visible, move, canDrop };
+  /** The tree before its first rows: a spinning row, so a slow GitHub shows as loading, not as nothing. */
+  const loadingHtml = () => `<div class="row" style="padding-left: 4px"><span class="tw"><span class="spin">${ICONS.loading}</span></span><span class="label desc">Loading repos…</span></div>`;
+
+  const api = { esc, ICONS, loadingHtml, rowHtml, workspacesHtml, visible, move, canDrop };
   if (typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
 
   // ---- in the webview ----
   const vscode = acquireVsCodeApi();
   const saved = vscode.getState() || {};
   const openState = saved.open || {};          // id -> true/false, set by the user; else the row's own default
-  let roots = [], kids = new Map(), byId = new Map(), asked = new Set(), loading = new Set(), wsItems = [], naming = null, focus = saved.focus || null;
+  let roots = [], kids = new Map(), byId = new Map(), asked = new Set(), loading = new Set(), wsItems = [], naming = null, rootsIn = false, wsIn = false, focus = saved.focus || null;
   const $ws = document.getElementById('ws'), $tree = document.getElementById('tree');
 
   const isOpen = (row) => (row.id in openState ? openState[row.id] : !!row.expanded);
@@ -135,7 +138,7 @@
     const input = $ws.querySelector('input.name');
     const had = input && document.activeElement === input ? [input.selectionStart, input.selectionEnd] : null;
     if (naming && !wsItems.some((w) => w.path === naming.path && !w.missing)) naming = null;   // its directory went
-    $ws.innerHTML = workspacesHtml(wsItems, naming);
+    $ws.innerHTML = wsIn ? workspacesHtml(wsItems, naming) : '';   // not a lone Add folder… before the list comes
     const box = $ws.querySelector('input.name');
     if (box && (had || naming.focus)) { box.focus(); if (had) box.setSelectionRange(had[0], had[1]); naming.focus = false; }
   }
@@ -145,6 +148,7 @@
     drawWs();
     const open = openSet();
     const list = visible(roots, kids, open);
+    if (!rootsIn) { $tree.innerHTML = loadingHtml(); return list; }
     $tree.innerHTML = list.map(({ row, depth }) => rowHtml(row, depth, { open: open.has(row.id), loading: loading.has(row.id), focused: row.id === focus })).join('');
     for (const { row } of list) {   // an open row without its children asks once per redraw
       if (open.has(row.id) && !kids.has(row.id) && !asked.has(row.id)) {
@@ -167,7 +171,7 @@
 
   window.addEventListener('message', (e) => {
     const m = e.data || {};
-    if (m.type === 'workspaces') { wsItems = m.items || []; render(); }
+    if (m.type === 'workspaces') { wsItems = m.items || []; wsIn = true; render(); }
     else if (m.type === 'ownerChoices') {
       if (naming && naming.step === 'owner') { naming.owners = m.items || []; naming.sel = 0; drawWs(); }
     }
@@ -176,11 +180,12 @@
     }
     else if (m.type === 'rows') {
       for (const r of m.rows || []) byId.set(r.id, r);
-      if (m.parent == null) roots = m.rows || []; else kids.set(m.parent, m.rows || []);
+      if (m.parent == null) { roots = m.rows || []; rootsIn = true; } else kids.set(m.parent, m.rows || []);
       loading.delete(m.parent);
       render();
     } else if (m.type === 'reset') {
-      roots = []; kids = new Map(); byId = new Map(); asked = new Set(); loading = new Set();
+      roots = []; kids = new Map(); byId = new Map(); asked = new Set(); loading = new Set(); rootsIn = false;
+      render();
       vscode.postMessage({ type: 'ready' });
     }
   });
@@ -281,5 +286,6 @@
     setTimeout(() => { if (naming && !$ws.contains(document.activeElement)) endNaming(); }, 0);
   });
 
+  render();   // Loading… at once
   vscode.postMessage({ type: 'ready' });
 })();

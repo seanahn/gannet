@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye, a Hidden row to show them again) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye, a Hidden row to show them again) built, 2026-11-27; 0.5.2 (a spinning Loading repos… row until the first rows come, no lone Add folder… before the workspace list, no "private", a smaller eye) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -138,7 +138,7 @@ GANNET
     ~/github
 ▾ REPOS                                         [+ account] [⟳]
   ▾ c3-e                     via c3-sahn
-      c3reliability          private
+      c3reliability
       c3nexus                ~/ · /git            (green Octocat: checked out)
       ▸ All repos
   ▸ c3-sahn
@@ -202,7 +202,8 @@ GANNET
 
 - A repo checked out anywhere on this machine has a **green Octocat** (`github-alt` coloured `charts.green`),
   instead of 0.2.0's clone icon. *(Sean)*
-- Its description lists the workspaces it is checked out in, after private/archived, e.g. `~/ · /git`. *(Sean:
+- Its description lists the workspaces it is checked out in, after archived (0.5.2 dropped **private**, *Sean:
+  "remove the private after the repo names"*), e.g. `~/ · /git`. *(Sean:
   "each repo may say - <workspace>")* A checkout in a folder outside every workspace shows that folder's parent.
 - **A repo can be checked out more than once**, into different folders. *(Sean)* This reverses 0.2.0's "one copy
   per repo".
@@ -305,8 +306,8 @@ GANNET                               [+ account] [⟳]
  ───────────────────────────────────────────────
  ▸ (org) bpmn2               via seanahn
  ▾ (org) c3-e                via c3-sahn
-   ▸ (cat) c3reliability     private               (recent repos first)
-   ▸ (cat) c3nexus           private · ~
+   ▸ (cat) c3reliability                           (recent repos first)
+   ▸ (cat) c3nexus           ~
    ▸ All repos               312
  ▾ (person) seanahn
    ▾ (green cat) perch       /git · ~/github       (two checkouts: one row each)
@@ -431,7 +432,7 @@ GANNET                               [+ account] [⟳]
  ▾ (org) c3-e                via c3-sahn
    ▾ (dim cat) newthing      not on GitHub yet · ~/github
        (file) notes.md
-   ▸ (cat) c3nexus           private
+   ▸ (cat) c3nexus
    ▸ (two cats) All repos    312
 ```
 

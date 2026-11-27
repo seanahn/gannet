@@ -292,7 +292,7 @@ class GannetTree {
         const copies = this.checkouts(repo);
         const list = this.workspaces ? this.workspaces.list() : [];
         const places = [...new Set(copies.map((c) => labelOf(c.path, list, this.home)))];
-        it.description = [repo.private && 'private', repo.archived && 'archived', ...places].filter(Boolean).join(' · ');
+        it.description = [repo.archived && 'archived', ...places].filter(Boolean).join(' · ');
         it.contextValue = !copies.length ? 'repo-remote' : copies.length > 1 ? 'repo-multi' : copies[0].login ? 'repo-local' : 'repo-local-foreign';
         it.tooltip = !copies.length ? 'Only on GitHub' : copies.map(checkoutLine).join('\n');   // Sean: the row already names the repo
         it.iconPath = copies.length ? new vs.ThemeIcon('github-alt', new vs.ThemeColor('charts.green')) : new vs.ThemeIcon('github-alt');
