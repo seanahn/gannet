@@ -14,6 +14,8 @@ const CSS = `
   .desc { margin-left: 6px; color: var(--vscode-descriptionForeground); overflow: hidden; text-overflow: ellipsis; font-size: 0.92em; }
   .tw { width: 16px; min-width: 16px; display: inline-flex; justify-content: center; margin-right: 4px; }
   .ws .lic { margin-right: 4px; margin-left: -2px; display: inline-flex; }
+  .ic.dim { color: var(--vscode-descriptionForeground); opacity: 0.8; }
+  .row.drop { outline: 1px dashed var(--vscode-focusBorder); outline-offset: -1px; background: var(--vscode-list-dropBackground, var(--vscode-list-hoverBackground)); }
   .ic { display: inline-flex; margin-right: 6px; }
   .green { color: var(--vscode-charts-green); }
   .chev svg { transition: transform 0.1s; }

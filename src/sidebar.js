@@ -76,7 +76,13 @@ class GannetSidebar {
         if (m.act === 'add') await cmd('gannet.addWorkspace');
         else if (m.act === 'remove' && m.path) await cmd('gannet.removeWorkspace', { path: m.path });
         else if (m.act === 'reveal' && m.path) await cmd('gannet.revealWorkspace', { path: m.path });
+        else if (m.act === 'newFolder' && m.path) await cmd('gannet.newFolder', { path: m.path });
         return;
+      case 'move': {   // a new folder dropped on an owner row; anything else is ignored
+        const node = this.store.node(m.id), target = this.store.node(m.to);
+        if (node && node.kind === 'newFolder' && target && target.kind === 'owner') await cmd('gannet.moveNewFolder', node, target);
+        return;
+      }
       default:
     }
   }

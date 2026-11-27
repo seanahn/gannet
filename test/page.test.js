@@ -54,4 +54,24 @@ assert.ok(P.ICONS['github-alt'].includes('M21.035 5.257'), 'codicon github-alt')
 assert.ok(P.ICONS['github-alt'].includes('viewBox="-3 -3 30 30"'), 'padded viewBox');
 // All repos: two small codicon cats, one behind the other (Sean: "small 2 cats icon")
 assert.strictEqual((P.ICONS.repos.match(/M21\.035 5\.257/g) || []).length, 2, 'two cats');
+// 0.5.0: New Folder on each live workspace; new-folder rows drag, owner rows take the drop; the dim cat
+const ws2 = P.workspacesHtml([{ path: '/git', label: '/git', missing: false, reveal: true }, { path: '/old', label: '~/old', missing: true, reveal: false }]);
+assert.strictEqual((ws2.match(/data-act="newFolder"/g) || []).length, 1);
+assert.ok(ws2.includes('title="New Folder…"'));
+assert.ok(ws2.indexOf('data-act="newFolder"') < ws2.indexOf('data-act="reveal"'), 'before Reveal');
+const nfRow = { id: 'o:c3-sahn:c3-e/n:/w/x', label: 'x', hasChildren: true, contextValue: 'newfolder', icon: { id: 'github-alt', color: 'descriptionForeground' } };
+const ownerE = { id: 'o:c3-sahn:c3-e', label: 'c3-e', hasChildren: true, contextValue: 'owner' };
+const ownerS = { id: 'o:seanahn:seanahn', label: 'seanahn', hasChildren: true, contextValue: 'account-vscode' };
+const repoR = { id: 'o:seanahn:seanahn/r:seanahn/perch', label: 'perch', hasChildren: true, contextValue: 'repo-remote' };
+assert.ok(P.rowHtml(nfRow, 1, {}).includes('draggable="true"'));
+assert.ok(!P.rowHtml(repoR, 1, {}).includes('draggable'));
+assert.ok(P.rowHtml(ownerE, 0, {}).includes('data-drop="1"') && P.rowHtml(ownerS, 0, {}).includes('data-drop="1"'));
+assert.ok(!P.rowHtml(repoR, 1, {}).includes('data-drop'));
+assert.ok(P.rowHtml(nfRow, 1, {}).includes('class="ic dim"') || P.rowHtml(nfRow, 1, {}).includes('ic dim'), 'dim cat');
+// Review Focus 2
+assert.strictEqual(P.canDrop(nfRow, ownerS), true);
+assert.strictEqual(P.canDrop(nfRow, ownerE), false, 'its own owner');
+assert.strictEqual(P.canDrop(repoR, ownerE), false);
+assert.strictEqual(P.canDrop(nfRow, repoR), false);
+assert.strictEqual(P.canDrop(null, ownerE), false);
 console.log('PAGE OK');

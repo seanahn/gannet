@@ -24,6 +24,7 @@
     'folder-opened': svg('<path d="M1.5 3.5h4l1.5 1.5h6v8h-11.5z"/>'),
     close: svg('<path d="M4 4l8 8M12 4l-8 8"/>'),
     add: svg('<path d="M8 3v10M3 8h10"/>'),
+    'new-folder': svg('<path d="M1.5 3.5h4l1.5 1.5h7.5v8h-13z"/><path d="M8 7.5v4M6 9.5h4"/>'),
     loading: svg('<path d="M8 2a6 6 0 106 6"/>'),
   };
   // All repos: two of the codicon cats, one behind and above the other
@@ -31,10 +32,18 @@
 
   const iconHtml = (icon) => {
     if (!icon || !ICONS[icon.id]) return '';
-    return `<span class="ic${icon.color === 'charts.green' ? ' green' : ''}">${ICONS[icon.id]}</span>`;
+    const tint = icon.color === 'charts.green' ? ' green' : icon.color === 'descriptionForeground' ? ' dim' : '';
+    return `<span class="ic${tint}">${ICONS[icon.id]}</span>`;
   };
 
   /** One row: indent, then the arrow column (an arrow for a parent, the icon for a leaf), label, description. */
+  const OWNER = /^(owner|account-)/;
+  /** A drag may land here: a new-folder row onto an owner row other than its own. */
+  function canDrop(drag, over) {
+    if (!drag || !over || drag.contextValue !== 'newfolder' || !OWNER.test(over.contextValue || '')) return false;
+    return !String(drag.id).startsWith(over.id + '/');
+  }
+
   function rowHtml(row, depth, { open = false, loading = false, focused = false } = {}) {
     const ctx = esc(JSON.stringify({ webviewSection: 'row', viewItem: row.contextValue || '', nodeId: row.id, preventDefaultContextMenuItems: true }));
     const twistie = loading ? `<span class="spin">${ICONS.loading}</span>`
@@ -42,6 +51,7 @@
         : iconHtml(row.icon).replace('class="ic', 'class="lic');
     return `<div class="row${focused ? ' focused' : ''}" role="treeitem" data-id="${esc(row.id)}"`
       + `${row.hasChildren ? ` aria-expanded="${open}"` : ''} data-vscode-context='${ctx}' title="${esc(row.tooltip || '')}"`
+      + (row.contextValue === 'newfolder' ? ' draggable="true"' : '') + (OWNER.test(row.contextValue || '') ? ' data-drop="1"' : '')
       + ` style="padding-left: ${depth * 8 + 4}px">`
       + `<span class="tw">${twistie}</span>${row.hasChildren ? iconHtml(row.icon) : ''}`
       + `<span class="label">${esc(row.label)}</span>${row.description ? `<span class="desc">${esc(row.description)}</span>` : ''}`
@@ -53,6 +63,7 @@
   function workspacesHtml(items) {
     return items.map((w) => `<div class="ws${w.missing ? ' missing' : ''}" data-path="${esc(w.path)}" title="${esc(w.path)}">`
       + `<span class="label">${esc(w.label)}</span>${w.missing ? '<span class="desc">Missing</span>' : ''}<span class="acts">`
+      + (w.missing ? '' : `<button class="act" data-act="newFolder" title="New Folder…">${ICONS['new-folder']}</button>`)
       + (w.missing || !w.reveal ? '' : `<button class="act" data-act="reveal" title="Reveal">${ICONS['folder-opened']}</button>`)
       + `<button class="act" data-act="remove" title="Remove from List">${ICONS.close}</button></span></div>`).join('')
       + `<div class="ws add" data-act="add" title="Add a folder Gannet checks repos out into"><span class="lic">${ICONS.add}</span><span class="label">Add folder…</span></div>`;
@@ -92,7 +103,7 @@
     }
   }
 
-  const api = { esc, ICONS, rowHtml, workspacesHtml, visible, move };
+  const api = { esc, ICONS, rowHtml, workspacesHtml, visible, move, canDrop };
   if (typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
 
   // ---- in the webview ----
@@ -164,6 +175,34 @@
     if (r.collapse) { openState[r.collapse] = false; save(); render(); }
     if (r.activate) activate(r.activate);
   });
+  // drag a new folder onto another owner row
+  let dragId = null;
+  const overRow = (e) => { const el = e.target.closest('.row[data-drop]'); return el ? { el, row: byId.get(el.dataset.id) } : null; };
+  const clearDrop = () => { for (const el of $tree.querySelectorAll('.row.drop')) el.classList.remove('drop'); };
+  $tree.addEventListener('dragstart', (e) => {
+    const el = e.target.closest('.row[draggable]');
+    if (!el) return;
+    dragId = el.dataset.id;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragId);
+  });
+  $tree.addEventListener('dragover', (e) => {
+    const o = overRow(e);
+    clearDrop();
+    if (!o || !canDrop(byId.get(dragId), o.row)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    o.el.classList.add('drop');
+  });
+  $tree.addEventListener('dragleave', (e) => { if (!$tree.contains(e.relatedTarget)) clearDrop(); });
+  $tree.addEventListener('drop', (e) => {
+    const o = overRow(e);
+    clearDrop();
+    if (o && canDrop(byId.get(dragId), o.row)) { e.preventDefault(); vscode.postMessage({ type: 'move', id: dragId, to: o.row.id }); }
+    dragId = null;
+  });
+  $tree.addEventListener('dragend', () => { dragId = null; clearDrop(); });
+
   $ws.addEventListener('click', (e) => {
     const act = e.target.closest('[data-act]');
     if (!act) return;

@@ -95,6 +95,37 @@ const { GannetSidebar } = require('../src/sidebar.js');
       assert.deepStrictEqual(v._posted.at(-1), { type: 'reset' }, 'the late answer is not posted');
       assert.strictEqual(sb.resolve({ nodeId: aId + '/i:old' }), undefined, 'nor remembered');
     }
+    // 0.5.0: New Folder from the panel; a drop moves a new folder onto an owner, and nothing else moves
+    await view._send({ type: 'ws', act: 'newFolder', path: gh });
+    assert.deepStrictEqual(rec.executed.at(-1), { id: 'gannet.newFolder', args: [{ path: gh }] });
+    {
+      const ownerA = { kind: 'owner', owner: 'c3-e', account: { login: 'c3-sahn' }, own: false };
+      const ownerB = { kind: 'owner', owner: 'seanahn', account: { login: 'seanahn' }, own: true };
+      const nfNode = { kind: 'newFolder', owner: 'c3-e', account: ownerA.account, rec: { path: '/w/x', owner: 'c3-e', account: 'c3-sahn' }, pending: null };
+      const repoNode = { kind: 'repo', account: ownerA.account, repo: { fullName: 'c3-e/hub', name: 'hub' } };
+      const small = {
+        onDidChangeTreeData: () => {},
+        getTreeItem: (n) => ({ label: n.owner || (n.rec && 'x') || n.repo.name, collapsibleState: n.kind === 'owner' ? 1 : 0, contextValue: n.kind === 'owner' ? 'owner' : n.kind === 'newFolder' ? 'newfolder' : 'repo-remote' }),
+        getChildren: async (n) => (!n ? [ownerA, ownerB] : n === ownerA ? [nfNode, repoNode] : []),
+      };
+      const sb = new GannetSidebar({ vscode, tree: small, workspaces: fx.workspaces, home: fx.home, extensionUri: vscode.Uri.file('/ext') });
+      vscode.window.registerWebviewViewProvider('gannet.dnd', sb);
+      const v = vscode._resolveView('gannet.dnd');
+      await v._send({ type: 'ready' });
+      const [rA, rB] = v._posted.at(-1).rows;
+      await v._send({ type: 'expand', id: rA.id });
+      const [rNf, rRepo] = v._posted.at(-1).rows;
+      await v._send({ type: 'move', id: rNf.id, to: rB.id });
+      assert.strictEqual(rec.executed.at(-1).id, 'gannet.moveNewFolder');
+      assert.strictEqual(rec.executed.at(-1).args[0], nfNode);
+      assert.strictEqual(rec.executed.at(-1).args[1], ownerB);
+      const ran2 = rec.executed.length;
+      await v._send({ type: 'move', id: rRepo.id, to: rB.id });
+      await v._send({ type: 'move', id: rNf.id, to: rRepo.id });
+      await v._send({ type: 'move', id: 'nope', to: rB.id });
+      await v._send({ type: 'move', id: rNf.id, to: 'nope' });
+      assert.strictEqual(rec.executed.length, ran2, 'Review Focus 2: nothing else moves');
+    }
     console.log('SIDEBAR OK');
   } finally { fx.cleanup(); }
 })().catch((e) => { console.error(e); process.exit(1); });
