@@ -374,6 +374,15 @@ const S = vscode.TreeItemCollapsibleState;
         const names = kids.filter((n) => n.kind === 'repo').map((n) => n.repo.fullName);
         assert.strictEqual(names[0], 'c3-e/sec', names.join(' '));
         assert.strictEqual(names.length, 10);
+        // 0.5.7: Recent rows and All repos rows say where they sit; a repo taken out gives way to the next
+        assert.ok(kids.filter((n) => n.kind === 'repo').every((n) => n.place === 'recent'));
+        const allG = kids.find((n) => n.kind === 'group');
+        assert.ok((await t3.getChildren(allG)).every((n) => n.place === 'all'));
+        const rec3 = createRecent(makeMemento());
+        await rec3.drop('c3-sahn', 'c3-e/sec');
+        const t4 = make({ local: loc, recent: rec3, cache: createRepoCache(fs.mkdtempSync(path.join(tmp, 'cache4-'))) });
+        const names4 = (await t4.getChildren(await ownerNode('c3-e', t4))).filter((n) => n.kind === 'repo').map((n) => n.repo.fullName);
+        assert.ok(!names4.includes('c3-e/sec') && names4.length === 10 && names4[9] === 'c3-e/p10', names4.join(' '));
       } finally { repoLists['c3-sahn'] = saved; }
     }
     console.log('TREE OK');

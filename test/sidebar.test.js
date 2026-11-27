@@ -153,6 +153,46 @@ const { GannetSidebar } = require('../src/sidebar.js');
       await v._send({ type: 'move', id: rNf.id, to: 'nope' });
       assert.strictEqual(rec.executed.length, ran2, 'Review Focus 2: nothing else moves');
     }
+    // 0.5.7: Recent ⇄ All repos, by drop or by button; only a repo of that owner, from the other place
+    {
+      const acct = { login: 'c3-sahn' };
+      const owner = { kind: 'owner', owner: 'c3-e', account: acct, own: false };
+      const other = { kind: 'owner', owner: 'zz', account: acct, own: false };
+      const all = { kind: 'group', which: 'all', owner: 'c3-e', account: acct };
+      const hub = { kind: 'repo', place: 'recent', account: acct, repo: { fullName: 'c3-e/hub', name: 'hub', owner: 'c3-e' } };
+      const zeta = { kind: 'repo', place: 'all', account: acct, repo: { fullName: 'C3-E/zeta', name: 'zeta', owner: 'C3-E' } };
+      const small = {
+        onDidChangeTreeData: () => {},
+        getTreeItem: (n) => ({ label: n.owner || (n.repo && n.repo.name) || 'All repos', collapsibleState: n.kind === 'repo' ? 0 : 1,
+          contextValue: { owner: 'owner', group: 'group-all' }[n.kind] || 'repo-remote' }),
+        getChildren: async (n) => (!n ? [owner, other] : n === owner ? [hub, all] : n === all ? [zeta] : []),
+      };
+      const sb = new GannetSidebar({ vscode, tree: small, workspaces: fx.workspaces, home: fx.home, extensionUri: vscode.Uri.file('/ext') });
+      vscode.window.registerWebviewViewProvider('gannet.recentdnd', sb);
+      const v = vscode._resolveView('gannet.recentdnd');
+      await v._send({ type: 'ready' });
+      const [rOwner, rOther] = v._posted.at(-1).rows;
+      await v._send({ type: 'expand', id: rOwner.id });
+      const [rHub, rAll] = v._posted.at(-1).rows;
+      await v._send({ type: 'expand', id: rAll.id });
+      const [rZeta] = v._posted.at(-1).rows;
+      const last = () => [rec.executed.at(-1).id, rec.executed.at(-1).args[0]];
+      await v._send({ type: 'move', id: rZeta.id, to: rOwner.id });
+      assert.deepStrictEqual(last(), ['gannet.addToRecent', zeta]);
+      await v._send({ type: 'move', id: rHub.id, to: rAll.id });
+      assert.deepStrictEqual(last(), ['gannet.removeFromRecent', hub]);
+      await v._send({ type: 'act', act: 'addRecent', id: rZeta.id });
+      assert.deepStrictEqual(last(), ['gannet.addToRecent', zeta]);
+      await v._send({ type: 'act', act: 'removeRecent', id: rHub.id });
+      assert.deepStrictEqual(last(), ['gannet.removeFromRecent', hub]);
+      const ran = rec.executed.length;
+      await v._send({ type: 'move', id: rZeta.id, to: rOther.id });
+      await v._send({ type: 'move', id: rHub.id, to: rOwner.id });
+      await v._send({ type: 'move', id: rZeta.id, to: rAll.id });
+      await v._send({ type: 'act', act: 'addRecent', id: rHub.id });
+      await v._send({ type: 'act', act: 'removeRecent', id: rZeta.id });
+      assert.strictEqual(rec.executed.length, ran, 'nothing else');
+    }
     console.log('SIDEBAR OK');
   } finally { fx.cleanup(); }
 })().catch((e) => { console.error(e); process.exit(1); });

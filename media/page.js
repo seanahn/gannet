@@ -28,6 +28,8 @@
     'eye-closed': svg('<path d="M3.5 6.5c1.2 1.4 2.7 2.1 4.5 2.1s3.3-.7 4.5-2.1"/><path d="M5 8.1l-.8 1.1M7 8.6l-.3 1.3M9 8.6l.3 1.3M11 8.1l.8 1.1"/>'),
     eye: svg('<path d="M3.5 8c1.2-2 2.7-3 4.5-3s3.3 1 4.5 3c-1.2 2-2.7 3-4.5 3s-3.3-1-4.5-3z"/><circle cx="8" cy="8" r="1.4"/>'),
     loading: svg('<path d="M8 2a6 6 0 106 6"/>'),
+    pin: svg('<path d="M6 2.5h4M7 2.5v4L4.5 9h7L9 6.5v-4M8 9v4.5"/>'),
+    unpin: svg('<path d="M6 2.5h4M7 2.5v4L4.5 9h7L9 6.5v-4M8 9v4.5M2.5 2.5l11 11"/>'),
   };
   // All repos: two of the codicon cats, one behind and above the other
   ICONS.repos = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">${CAT('9.5 1')}${CAT('0 9.5')}</svg>`;
@@ -40,11 +42,29 @@
 
   /** One row: indent, then the arrow column (an arrow for a parent, the icon for a leaf), label, description. */
   const OWNER = /^(owner|account-)/;
-  /** A drag may land here: a new-folder row onto an owner row other than its own. */
+  /** Where a repo row sits: 'recent' (straight under its owner), 'all' (inside All repos), or null for any other row. */
+  function placeOf(id) {
+    const s = String(id);
+    if (/^o:[^/]+\/all\/r:[^/]+\/[^/]+$/.test(s)) return 'all';
+    if (/^o:[^/]+\/r:[^/]+\/[^/#]+(#\d+)?$/.test(s)) return 'recent';
+    return null;
+  }
+  const ownerIdOf = (id) => String(id).split('/')[0];
+  /** A drag may land here: a new-folder row onto an owner row other than its own; a repo from All repos onto its
+   *  owner (into Recent); a Recent repo onto its owner's All repos (out of Recent). */
   function canDrop(drag, over) {
-    if (!drag || !over || drag.contextValue !== 'newfolder' || !OWNER.test(over.contextValue || '')) return false;
+    if (!drag || !over) return false;
+    const place = placeOf(drag.id);
+    if (place === 'all') return OWNER.test(over.contextValue || '') && over.id === ownerIdOf(drag.id);
+    if (place === 'recent') return over.contextValue === 'group-all' && over.id === ownerIdOf(drag.id) + '/all';
+    if (drag.contextValue !== 'newfolder' || !OWNER.test(over.contextValue || '')) return false;
     return !String(drag.id).startsWith(over.id + '/');
   }
+
+  const recentButton = (id) => ({
+    all: `<button class="act" data-act="addRecent" title="Add to Recent">${ICONS.pin}</button>`,
+    recent: `<button class="act" data-act="removeRecent" title="Remove from Recent">${ICONS.unpin}</button>`,
+  })[placeOf(id)] || '';
 
   function rowHtml(row, depth, { open = false, loading = false, focused = false } = {}) {
     const ctx = esc(JSON.stringify({ webviewSection: 'row', viewItem: row.contextValue || '', nodeId: row.id, preventDefaultContextMenuItems: true }));
@@ -53,11 +73,12 @@
         : iconHtml(row.icon).replace('class="ic', 'class="lic');
     return `<div class="row${focused ? ' focused' : ''}" role="treeitem" data-id="${esc(row.id)}"`
       + `${row.hasChildren ? ` aria-expanded="${open}"` : ''} data-vscode-context='${ctx}' title="${esc(row.tooltip || '')}"`
-      + (row.contextValue === 'newfolder' ? ' draggable="true"' : '') + (OWNER.test(row.contextValue || '') ? ' data-drop="1"' : '')
+      + (row.contextValue === 'newfolder' || placeOf(row.id) ? ' draggable="true"' : '')
+      + (OWNER.test(row.contextValue || '') || row.contextValue === 'group-all' ? ' data-drop="1"' : '')
       + ` style="padding-left: ${depth * 8 + 4}px">`
       + `<span class="tw">${twistie}</span>${row.hasChildren ? iconHtml(row.icon) : ''}`
       + `<span class="label">${esc(row.label)}</span>${row.description ? `<span class="desc">${esc(row.description)}</span>` : ''}`
-      + (/^repo-/.test(row.contextValue || '') ? `<span class="acts"><button class="act" data-act="checkout" title="${row.contextValue === 'repo-remote' ? 'Check Out' : 'Check Out Another Copy'}">${ICONS.cloud}</button></span>` : '')
+      + (/^repo-/.test(row.contextValue || '') ? `<span class="acts">${recentButton(row.id)}<button class="act" data-act="checkout" title="${row.contextValue === 'repo-remote' ? 'Check Out' : 'Check Out Another Copy'}">${ICONS.cloud}</button></span>` : '')
       + (/^hidden-/.test(row.contextValue || '') ? `<span class="acts"><button class="act" data-act="show" title="${row.contextValue === 'hidden-owner' ? 'Show Owner' : 'Show Account'}">${ICONS.eye}</button></span>` : '')
       + (row.contextValue === 'owner' ? `<span class="acts"><button class="act" data-act="hideOwner" title="Hide Owner">${ICONS['eye-closed']}</button></span>` : '')
       + '</div>';
@@ -120,7 +141,7 @@
   /** The tree before its first rows: a spinning row, so a slow GitHub shows as loading, not as nothing. */
   const loadingHtml = () => `<div class="row" style="padding-left: 4px"><span class="tw"><span class="spin">${ICONS.loading}</span></span><span class="label desc">Loading repos…</span></div>`;
 
-  const api = { esc, ICONS, loadingHtml, rowHtml, workspacesHtml, visible, move, canDrop };
+  const api = { esc, ICONS, loadingHtml, rowHtml, workspacesHtml, visible, move, canDrop, placeOf };
   if (typeof module !== 'undefined' && module.exports) { module.exports = api; return; }
 
   // ---- in the webview ----
@@ -211,7 +232,7 @@
     if (r.collapse) { openState[r.collapse] = false; save(); render(); }
     if (r.activate) activate(r.activate);
   });
-  // drag a new folder onto another owner row
+  // drag a new folder onto another owner row, or a repo between its owner's Recent and All repos
   let dragId = null;
   const overRow = (e) => { const el = e.target.closest('.row[data-drop]'); return el ? { el, row: byId.get(el.dataset.id) } : null; };
   const clearDrop = () => { for (const el of $tree.querySelectorAll('.row.drop')) el.classList.remove('drop'); };

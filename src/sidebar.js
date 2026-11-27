@@ -73,6 +73,8 @@ class GannetSidebar {
         else if (node && m.act === 'hideOwner' && node.kind === 'owner') await cmd('gannet.hideOwner', node);
         else if (node && m.act === 'show' && node.kind === 'hiddenOwner') await cmd('gannet.showOwner', node);
         else if (node && m.act === 'show' && node.kind === 'hiddenAccount') await cmd('gannet.showAccount', node);
+        else if (node && m.act === 'addRecent' && node.kind === 'repo' && node.place === 'all') await cmd('gannet.addToRecent', node);
+        else if (node && m.act === 'removeRecent' && node.kind === 'repo' && node.place === 'recent') await cmd('gannet.removeFromRecent', node);
         return;
       }
       case 'ws':
@@ -97,9 +99,14 @@ class GannetSidebar {
         this.post({ type: 'nameCheck', path: m.path, name: m.name, message, error: !c.ok });
         return;
       }
-      case 'move': {   // a new folder dropped on an owner row; anything else is ignored
+      case 'move': {   // a new folder onto an owner row; a repo between its owner's Recent and All repos; nothing else
         const node = this.store.node(m.id), target = this.store.node(m.to);
-        if (node && node.kind === 'newFolder' && target && target.kind === 'owner') await cmd('gannet.moveNewFolder', node, target);
+        if (!node || !target) return;
+        const mine = (t) => t.account && node.account && t.account.login === node.account.login
+          && String(t.owner).toLowerCase() === String(node.repo.owner).toLowerCase();
+        if (node.kind === 'newFolder' && target.kind === 'owner') await cmd('gannet.moveNewFolder', node, target);
+        else if (node.kind === 'repo' && node.place === 'all' && target.kind === 'owner' && mine(target)) await cmd('gannet.addToRecent', node);
+        else if (node.kind === 'repo' && node.place === 'recent' && target.kind === 'group' && target.which === 'all' && mine(target)) await cmd('gannet.removeFromRecent', node);
         return;
       }
       default:

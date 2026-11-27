@@ -261,6 +261,17 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
       if (hidden.some((o) => String(o).toLowerCase() === node.owner.toLowerCase())) return;
       await settings().update('hiddenOwners', [...hidden, node.owner], vscode.ConfigurationTarget.Global);
     },
+    // a repo between Recent and All repos: its pin button, or a drop; the redraw shows it moved
+    'gannet.addToRecent': async (node) => {
+      if (!node || node.kind !== 'repo' || node.place !== 'all' || !node.account) return;
+      await recent.touch(node.account.login, node.repo.fullName);
+      tree.redraw();
+    },
+    'gannet.removeFromRecent': async (node) => {
+      if (!node || node.kind !== 'repo' || node.place !== 'recent' || !node.account) return;
+      await recent.drop(node.account.login, node.repo.fullName);
+      tree.redraw();
+    },
     // the Hidden row's eye: out of the setting again (any case); the config change redraws
     'gannet.showOwner': async (node) => {
       if (!node || node.kind !== 'hiddenOwner') return;
@@ -343,7 +354,7 @@ async function activateWith(context, { run = runProcess, fetch = globalThis.fetc
   })();
 }
 
-const NODE_COMMANDS = new Set(['gannet.checkout', 'gannet.checkoutTo', 'gannet.openOnGitHub', 'gannet.revealLocal', 'gannet.addToWorkspace', 'gannet.pushAs', 'gannet.hideAccount', 'gannet.hideOwner', 'gannet.signIn', 'gannet.moveNewFolder', 'gannet.forgetNewFolder', 'gannet.showOwner', 'gannet.showAccount']);
+const NODE_COMMANDS = new Set(['gannet.checkout', 'gannet.checkoutTo', 'gannet.openOnGitHub', 'gannet.revealLocal', 'gannet.addToWorkspace', 'gannet.pushAs', 'gannet.hideAccount', 'gannet.hideOwner', 'gannet.signIn', 'gannet.moveNewFolder', 'gannet.forgetNewFolder', 'gannet.showOwner', 'gannet.showAccount', 'gannet.addToRecent', 'gannet.removeFromRecent']);
 
 function activate(context) { return activateWith(context); }
 

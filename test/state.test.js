@@ -53,6 +53,20 @@ const repo = (fullName) => ({ fullName, owner: fullName.split('/')[0], name: ful
   assert.strictEqual(recent.merge('l', pushed, known).length, 10, 'no local list: as before');
 }
 
+// 0.5.7: Remove from Recent keeps a repo out (used, local and pushed alike) until it is used in Gannet again
+{
+  const recent = createRecent(makeMemento());
+  const pushed = ['a/p1', 'a/p2', 'a/sec'].map(repo);
+  recent.touch('l', 'a/p2');
+  recent.drop('l', 'a/p2');
+  recent.drop('l', 'A/SEC');
+  const names = (login) => recent.merge(login, pushed, new Map(), () => true, ['a/sec']).map((r) => r.fullName);
+  assert.deepStrictEqual(names('l'), ['a/p1'], 'out of every source, any case');
+  assert.deepStrictEqual(names('other'), ['a/sec', 'a/p1', 'a/p2'], 'per account');
+  recent.touch('l', 'a/sec');
+  assert.deepStrictEqual(names('l'), ['a/sec', 'a/p1'], 'used again: back, at the top');
+}
+
 // a checkout's last work: the newest of .git/logs/HEAD and .git/index; byActivity orders this machine's checkouts
 {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gannet-act-'));

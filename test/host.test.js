@@ -118,6 +118,18 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
     const hideMenu = manifest.contributes.menus['webview/context'].find((m) => m.command === 'gannet.hideOwner');
     assert.ok(/viewItem == owner\b/.test(hideMenu.when), hideMenu.when);
 
+    // 0.5.7: Add to Recent / Remove from Recent, kept in global state; only a repo of the matching place
+    await vscode.commands.executeCommand('gannet.removeFromRecent', { kind: 'repo', place: 'recent', account, repo });
+    assert.deepStrictEqual(context.globalState.get('gannet.recentOut').seanahn, ['seanahn/perch']);
+    assert.ok(!(context.globalState.get('gannet.recent').seanahn || []).includes('seanahn/perch'));
+    await vscode.commands.executeCommand('gannet.addToRecent', { kind: 'repo', place: 'all', account, repo });
+    assert.deepStrictEqual(context.globalState.get('gannet.recentOut').seanahn, []);
+    assert.strictEqual(context.globalState.get('gannet.recent').seanahn[0], 'seanahn/perch');
+    await vscode.commands.executeCommand('gannet.removeFromRecent', { kind: 'repo', place: 'all', account, repo });
+    await vscode.commands.executeCommand('gannet.addToRecent', { kind: 'owner', account, owner: 'x' });
+    assert.deepStrictEqual(context.globalState.get('gannet.recentOut').seanahn, [], 'not from All repos, not an owner');
+    for (const id of ['gannet.addToRecent', 'gannet.removeFromRecent']) assert.strictEqual(manifest.contributes.menus.commandPalette.find((m) => m.command === id).when, 'false', id);
+
     // a file over 10 MB: a note with Open on GitHub, not opened
     const before = rec.executed.filter((e) => e.id === 'vscode.open').length;
     await vscode.commands.executeCommand('gannet.openFile', { kind: 'entry', account, repo, entry: { name: 'big.bin', path: 'big.bin', type: 'file', size: 11 * 1024 * 1024, htmlUrl: 'https://github.com/seanahn/perch/blob/main/big.bin' } });

@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye, a Hidden row to show them again) built, 2026-11-27; 0.5.2 (a spinning Loading repos… row until the first rows come, no lone Add folder… before the workspace list, no "private", a smaller eye) built, 2026-11-27. 0.5.3 (the sidebar titled GitHub) built, 2026-11-27; 0.5.4 (the cat in the activity bar) built, 2026-11-27; 0.5.5 (New Folder… always shown, Add Workspace…) built, 2026-11-27; 0.5.6 (this machine's checkouts in Recent, by local activity) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye, a Hidden row to show them again) built, 2026-11-27; 0.5.2 (a spinning Loading repos… row until the first rows come, no lone Add folder… before the workspace list, no "private", a smaller eye) built, 2026-11-27. 0.5.3 (the sidebar titled GitHub) built, 2026-11-27; 0.5.4 (the cat in the activity bar) built, 2026-11-27; 0.5.5 (New Folder… always shown, Add Workspace…) built, 2026-11-27; 0.5.6 (this machine's checkouts in Recent, by local activity) built, 2026-11-27; 0.5.7 (a repo dragged or pinned between Recent and All repos) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -184,7 +184,18 @@ GANNET
   recently worked on first. "Worked on" is the newest modification time of the checkout's `.git/logs/HEAD`
   (commits, checkouts, pulls) and `.git/index` (staging, switching); a worktree's `.git` file is followed; a
   checkout with neither ranks last among them; several checkouts of one repo count by the newest. *(builder's
-  call on the files; Sean agreed to "the latest git activity in the checkout")* All repos is the account's full list,
+  call on the files; Sean agreed to "the latest git activity in the checkout")*
+- **A repo moves between Recent and All repos (0.5.7).** *(Sean: "can we also drag and drop between recent and all?
+  plus, a way to do that with icon?")*
+  - **Into Recent:** drag a repo from All repos onto its own owner row, or use the pin hover button (Add to
+    Recent) on an All repos row. It counts as used in Gannet: it goes to the top of Recent.
+  - **Out of Recent:** drag a Recent repo onto its own owner's All repos row, or use the crossed-out pin (Remove
+    from Recent). It stays out of Recent, whatever would bring it there (used in Gannet, a checkout here,
+    GitHub's pushed list), until it is used in Gannet again: opened, checked out or added back. *(Sean chose
+    this over only undoing the "used in Gannet" mark.)* The next repo in line takes its place.
+  - Drops anywhere else do nothing: not onto another owner, not from Recent onto the owner. Taken-out repos are
+    kept per account in global state (`gannet.recentOut`, lowercased, at most 500); they are not listed under
+    Hidden, since All repos still shows them. No context-menu entries. *(builder's calls)* All repos is the account's full list,
   fetched once and shared by all its owner nodes, filtered to the owner.
 - **The full list is cached on disk, once read.** Fetching every page takes long for an account that reaches many
   repos, so after the first fetch each account's list is kept in a file in Gannet's global storage and used on

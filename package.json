@@ -2,7 +2,7 @@
   "name": "gannet",
   "displayName": "Gannet",
   "description": "Your GitHub repos as a tree: browse files without cloning, check out into your workspace, push as the right account.",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "publisher": "seanahn",
   "license": "MIT",
   "repository": {
@@ -156,6 +156,16 @@
         "category": "Gannet"
       },
       {
+        "command": "gannet.addToRecent",
+        "title": "Add to Recent",
+        "category": "Gannet"
+      },
+      {
+        "command": "gannet.removeFromRecent",
+        "title": "Remove from Recent",
+        "category": "Gannet"
+      },
+      {
         "command": "gannet.showAccount",
         "title": "Show Account",
         "category": "Gannet"
@@ -229,6 +239,14 @@
         },
         {
           "command": "gannet.showOwner",
+          "when": "false"
+        },
+        {
+          "command": "gannet.addToRecent",
+          "when": "false"
+        },
+        {
+          "command": "gannet.removeFromRecent",
           "when": "false"
         },
         {
