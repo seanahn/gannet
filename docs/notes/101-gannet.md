@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25. How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -339,7 +339,8 @@ GANNET                               [+ account] [⟳]
   - icons are inline SVG in the page, like Perch's; no icon font or other dependency. *(builder's call)*
   - the repo icon is codicon `github-alt` itself, copied into the page (CC BY 4.0, credited in the code), the cat
     with no circle; 0.4.0 shipped a hand-drawn round GitHub mark by mistake. *(Sean: "somehow the circle on cat icon
-    is back")*
+    is back")* It draws at about 13 px inside the 16 px icon box, so labels stay aligned. *(Sean: "can
+    you make the icon smaller"; builder's call on the size)*
 - **A repo's tooltip does not repeat its name** (the row shows it). A repo only on GitHub says **Only on GitHub**; a
   checked-out one has a line per checkout: its path, its branch (`detached at <sha>` when no branch is checked
   out), and `pushes as <login>` when it pushes as an account, e.g. `/home/jovyan/c3nexus · main · pushes as

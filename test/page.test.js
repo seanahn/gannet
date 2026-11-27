@@ -48,4 +48,6 @@ assert.ok(html.includes("script-src 'nonce-N1'") && html.includes('<script nonce
 assert.ok(html.includes('id="ws"') && html.includes('id="tree"'));
 // the repo icon is codicon github-alt, the cat with no circle (VS Code's own `github` is the round mark)
 assert.ok(P.ICONS['github-alt'].includes('M21.035 5.257'), 'codicon github-alt');
+// the cat draws at about 13 px inside the 16 px icon box (Sean: "can you make the icon smaller")
+assert.ok(P.ICONS['github-alt'].includes('viewBox="-3 -3 30 30"'), 'padded viewBox');
 console.log('PAGE OK');
