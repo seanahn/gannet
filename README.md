@@ -10,7 +10,7 @@ A **Gannet** icon in the activity bar opens one sidebar: the directories you kee
 repos, grouped by owner, below.
 
 ```
-GANNET                               [+ account] [⟳]
+GITHUB                               [+ account] [⟳]
   /git                                  [📂] [✕]     (buttons show on hover)
   ~/github                              [📂] [✕]
   + Add folder…

@@ -1,6 +1,6 @@
 # 101 — Gannet: GitHub as a drive in VS Code
 
-Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye, a Hidden row to show them again) built, 2026-11-27; 0.5.2 (a spinning Loading repos… row until the first rows come, no lone Add folder… before the workspace list, no "private", a smaller eye) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
+Built, 2026-11-25 (0.1.0); Workspaces built, 2026-11-25 (0.2.0); 0.3.0 (owners, workspace directories) built, 2026-11-25; 0.4.0 (one webview sidebar) built, 2026-11-25 (no PR: commits to `main`; the last commit with its plan is 8bc8c34); 0.4.1 (Hide Owner, Check Out Another Copy, the cat icon without its circle) built, 2026-11-25; 0.4.2 (a smaller cat, two cats on All repos, Reveal that works in a remote window) built, 2026-11-27; 0.5.0 (new folders not on GitHub yet) built, 2026-11-27 (no PR: commits to `main`; the last commit with its plan is d8e7785). 0.5.1 (a new folder named and placed in the sidebar, not in VS Code's boxes; Hide Owner's eye, a Hidden row to show them again) built, 2026-11-27; 0.5.2 (a spinning Loading repos… row until the first rows come, no lone Add folder… before the workspace list, no "private", a smaller eye) built, 2026-11-27. 0.5.3 (the sidebar titled GitHub) built, 2026-11-27. How to build, install and use it: [README.md](../../README.md).
 Built on `main` with no PR (the first commits of a new repo); the build plan was last present at `0569daa`.
 Workspaces were also built on `main` with no PR; their plan was last present at `701cd3b`.
 0.3.0 was also built on `main` with no PR; its plan was last present at `6022bdf`.
@@ -302,7 +302,7 @@ and workspaces stays as 0.3.0 describes.
 **Add folder…**. *(Sean: "no indication of the trees are being loaded up")*
 
 ```
-GANNET                               [+ account] [⟳]
+GITHUB                               [+ account] [⟳]
   /git                                  [📂] [✕]     (buttons show on hover)
   ~/github                              [📂] [✕]
   ~/old                     Missing           [✕]
@@ -325,7 +325,7 @@ GANNET                               [+ account] [⟳]
 ### What it is
 
 - **One view, a webview,** like Perch's Sessions panel. With one view in the container, VS Code merges its
-  header into the **GANNET** title, so there is no header row; **+ account** and **⟳** sit in that title. *(Sean)*
+  header into the **GITHUB** title (**GANNET** until 0.5.3), so there is no header row; **+ account** and **⟳** sit in that title. *(Sean)*
 - **On top, the workspace directories** as a small configuration panel, not a tree: one row per directory (`~` for
   home, full path as tooltip), with **Reveal** and **✕ Remove from list** buttons
   that show on hover, **Missing** on a directory that is gone (Reveal is not offered there), and an **Add folder…**
@@ -393,7 +393,7 @@ GANNET                               [+ account] [⟳]
 - No search box, no drag and drop, no multi-select. *(non-goals: the tree had none)*
 - A click or expand that names a row the extension no longer knows (it arrived just after a refresh) is ignored
   quietly; the page asks for each row's children at most once per redraw. Rows are 22 px high and indent 8 px a
-  level, as VS Code's lists. The view's name is empty, so its title is just **GANNET**. *(builder's calls)*
+  level, as VS Code's lists. The view's name is empty, so its title is just the container's, **GITHUB** since 0.5.3 (*Sean: "the title of gannet explorer, do not say gannet, say github"*; it was **GANNET**). *(builder's calls)*
 
 ### How it is made
 
@@ -429,7 +429,7 @@ manually from the workspaces links in the gannet explorer")* Either way the fold
 meant for. *(Sean: "visually the new folder should sit under one org, right?")*
 
 ```
-GANNET                               [+ account] [⟳]
+GITHUB                               [+ account] [⟳]
   ~/github                   [+📁] [📂] [✕]          (buttons show on hover)
   + Add folder…
  ───────────────────────────────────────────────

@@ -485,6 +485,8 @@ const seed = (c, k, v) => { const m = machine(c); m[k] = v; fs.mkdirSync(path.di
     }
     assert.ok(!('dependencies' in manifest) || !manifest.dependencies['jsonc-parser']);
     assert.ok(!manifest.contributes.configuration.properties['gannet.checkoutFolder'], 'retired');
+    // the sidebar's title says what it shows, GitHub, not the extension's name (Sean)
+    assert.strictEqual(manifest.contributes.viewsContainers.activitybar.find((c) => c.id === 'gannet').title, 'GitHub');
     // 0.4.0: one webview view; right-click menus on its rows; title buttons on it
     assert.deepStrictEqual(manifest.contributes.views.gannet, [{ type: 'webview', id: 'gannet.main', name: '' }]);
     assert.ok(!('view/item/context' in manifest.contributes.menus));
